@@ -82,15 +82,15 @@ impl Proof {
                 if proof.lines.len() < l {
                     l = proof.lines.len();
                     println!("Proof found of length {}", proof.lines.len());
-                    self.lines = proof.lines;
+                    self.lines = proof.clone().lines;
                     self.max_line_length = self.lines.len();
                 }
                 break;
             }
         }
         // 1 in 50 chance to randomly print the proof as an example
-        if rand::random::<usize>() % 10 == 0 {
-            println!("{}", self);
+        if rand::random::<usize>() % 1000 == 0 {
+            println!("{}", proof);
         }
         (c, l)
     }
@@ -131,9 +131,9 @@ impl Proof {
         if self.lines.len() > 1 {
             possible_rules.push(Rule::OrIntroduction);
         }
-        if rand::random::<usize>() % 10 == 0 && self.max_line_length - self.lines.len() > 3 {
-            possible_rules.push(Rule::ConditionalProof);
-        }
+        // if rand::random::<usize>() % 10 == 0 && self.max_line_length - self.lines.len() > 3 {
+        //     possible_rules.push(Rule::ConditionalProof);
+        // }
 
         let rand = rand::random::<usize>() % possible_rules.len();
         let rule = &possible_rules[rand];
