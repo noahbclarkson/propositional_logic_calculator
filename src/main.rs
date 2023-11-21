@@ -1,4 +1,4 @@
-use propositional_logic_calculator::proof::Proof;
+use propositional_logic_calculator::proof::{Proof, SearchSettingsBuilder};
 
 fn main() {
     println!("Enter the propositional logic statement: ");
@@ -12,10 +12,17 @@ fn main() {
     let assumptions: Vec<&str> = assumptions.pop().unwrap().split(',').collect();
     let assumptions: Vec<String> = assumptions.iter().map(|x| x.to_string()).collect();
     let conclusion = conclusion.to_string();
-    let mut proof = Proof::new(assumptions, conclusion, None);
-    println!("Proof: {}", proof);
-    proof.run();
-    println!("Proof: {}", proof);
+    let settings = SearchSettingsBuilder::default()
+        .max_line_length(10)
+        .iterations(10000000)
+        .build()
+        .unwrap();
+    let mut proof = Proof::new(assumptions, conclusion, Some(settings)).unwrap();
+    let result = proof.search();
+    match result {
+        Ok(_) => println!("Found proof: {}", proof),
+        Err(state) => panic!("Did not find proof, state: {:?}", state),
+    }
 }
 
 fn get_input() -> String {
