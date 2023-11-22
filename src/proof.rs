@@ -1,9 +1,8 @@
 use crate::{
     error::{ParserError, ProofError},
-    lines::{possible_lines, Line, ProofState, Rule},
+    lines::{Line, PossibleFinder, Rule},
 };
 use derive_builder::Builder;
-use enum_iterator::all;
 use std::{
     cell::RefCell,
     collections::VecDeque,
@@ -15,24 +14,24 @@ use std::{
 
 use crate::{expression::Expression, parser::Parser};
 
-const DEFAULT_MAX_LINE_LENGTH: usize = 10;
-const DEFAULT_ITERATIONS: usize = 20000;
+const DEFAULT_MAX_LINE_LENGTH: usize = 6;
+const DEFAULT_ITERATIONS: usize = 10000;
 
 static ITERATIONS: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Debug, Clone, Builder)]
 pub struct SearchSettings {
     #[builder(default = "DEFAULT_MAX_LINE_LENGTH")]
-    max_line_length: usize,
+    pub(crate) max_line_length: usize,
     #[builder(default = "DEFAULT_ITERATIONS")]
-    iterations: usize,
+    pub(crate) iterations: usize,
 }
 
 #[derive(Debug, Clone)]
 pub struct Proof {
     assumptions: Vec<Expression>,
     conclusion: Expression,
-    lines: Vec<Line>,
+    pub(crate) lines: Vec<Line>,
     settings: Rc<SearchSettings>,
 }
 
@@ -59,6 +58,7 @@ impl Display for SearchState {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct SearchNode {
     pub parent: Option<Rc<RefCell<Self>>>,
     pub children: Vec<Rc<RefCell<Self>>>,
@@ -121,22 +121,82 @@ impl Proof {
             Err(err) => return Err(err),
         }
     }
+
+    /// Get all lines that are not assumptions
+    pub fn get_deduction_lines(&self) -> Vec<Line> {
+        self.lines
+            .iter()
+            .filter(|x| x.rule != Rule::Assumption)
+            .cloned()
+            .collect()
+    }
 }
 
 impl Display for Proof {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let assumptions = self
-            .assumptions
-            .iter()
-            .map(|a| a.to_string())
-            .collect::<Vec<String>>()
-            .join(", ");
-        write!(f, "{} / {}", assumptions, self.conclusion)?;
+        let mut in_nested_proof = false;
+
+        writeln!(f, "Assumptions: [{}]", join_expressions(&self.assumptions))?;
+        writeln!(f, "Conclusion: {}", self.conclusion)?;
+        writeln!(f, "Total Proof Steps: {}", self.lines.len())?;
+        writeln!(f, "Proof Steps:")?;
+
         for line in &self.lines {
-            write!(f, "\n{}", line)?;
+            // Check if the line starts or ends a nested proof
+            match line.rule {
+                Rule::OrEliminationAssumption => in_nested_proof = true,
+                Rule::OrElimination => in_nested_proof = false,
+                _ => (),
+            }
+
+            // Apply indentation if in a nested proof
+            let indent = if in_nested_proof { "    " } else { "" };
+            writeln!(f, "{}{}", indent, line)?;
         }
+
         Ok(())
     }
+}
+
+fn join_expressions(expressions: &[Expression]) -> String {
+    expressions
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<String>>()
+        .join(", ")
+}
+
+impl Display for Line {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Base line format with assumption lines, line number, and expression
+        write!(
+            f,
+            "Line {}: {} [{}] using {}",
+            self.line_number + 1,
+            self.expression,
+            join(&self.assumption_lines),
+            self.rule,
+        )?;
+
+        // Append 'from lines' only if there are deduction lines
+        if !self.deduction_lines.is_empty() {
+            write!(f, " from lines {}", join(&self.deduction_lines))?;
+        }
+
+        Ok(())
+    }
+}
+
+fn join(array: &Vec<usize>) -> String {
+    let mut array = array.clone();
+    array.dedup();
+    array.sort();
+    array
+        .iter()
+        .map(|x| x + 1)
+        .map(|x| x.to_string())
+        .collect::<Vec<String>>()
+        .join(", ")
 }
 
 impl SearchNode {
@@ -158,21 +218,12 @@ impl SearchNode {
         self.lines.iter().any(|x| x.expression == self.conclusion)
     }
 
-    fn find_possible_lines(&self) -> Vec<Line> {
-        all::<Rule>()
-            .skip(1)
-            // TODO: Implement these rules
-            .filter(|x| {
-                x.clone() != Rule::ConditionalProof
-                && x.clone() != Rule::ReductioAdAbsurdium
-            })
-            .flat_map(|x| {
-                possible_lines(
-                    ProofState::new(self.lines.clone(), self.conclusion.clone()),
-                    x,
-                )
-            })
-            .collect::<Vec<Line>>()
+    pub fn assumptions(&self) -> Vec<Expression> {
+        self.lines
+            .iter()
+            .filter(|x| x.rule == Rule::Assumption)
+            .map(|x| x.expression.clone())
+            .collect()
     }
 }
 
@@ -195,21 +246,27 @@ fn search(head: Rc<RefCell<SearchNode>>) -> Result<Vec<Line>, ProofError> {
             break;
         }
 
-        let possibles = current.find_possible_lines();
-        for possible in possibles.clone() {
-            match possible.expression == current.conclusion {
-                true =>  {
+        let mut finder = PossibleFinder::new(head.borrow().clone());
+        finder.find();
+
+        for possible in finder.possibles() {
+            match possible
+                .lines
+                .last()
+                .unwrap()
+                .matches_expression(&current.conclusion)
+            {
+                true => {
                     let mut new_lines = current.lines.clone();
-                    new_lines.push(possible);
+                    new_lines.extend(possible.lines.clone());
                     return Ok(new_lines);
                 }
                 false => (),
-                
             }
         }
-        for possible_line in possibles {
+        for possible in finder.possibles() {
             let mut new_lines = current.lines.clone();
-            new_lines.push(possible_line);
+            new_lines.extend(possible.lines.clone());
             let new_node = SearchNode::new(
                 new_lines,
                 current.conclusion.clone(),

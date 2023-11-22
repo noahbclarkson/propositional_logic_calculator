@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use propositional_logic_calculator::{parser::Parser, expression::Expression};
+use propositional_logic_calculator::{expression::Expression, parser::Parser};
 
 #[test]
 fn test_parse_simple_expression() {

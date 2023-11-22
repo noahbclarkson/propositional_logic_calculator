@@ -13,8 +13,8 @@ fn main() {
     let assumptions: Vec<String> = assumptions.iter().map(|x| x.to_string()).collect();
     let conclusion = conclusion.to_string();
     let settings = SearchSettingsBuilder::default()
-        .max_line_length(10)
-        .iterations(10000000)
+        .max_line_length(15)
+        .iterations(100000)
         .build()
         .unwrap();
     let mut proof = Proof::new(assumptions, conclusion, Some(settings)).unwrap();

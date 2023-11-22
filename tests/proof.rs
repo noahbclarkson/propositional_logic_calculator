@@ -6,7 +6,7 @@ fn create_and_test_proof(assumptions: Vec<&str>, conclusion: &str) {
     let mut proof = Proof::new(assumptions, conclusion, None).unwrap();
     let result = proof.search();
     match result {
-        Ok(_) => println!("Found proof: {}", proof),
+        Ok(_) => println!("Found proof: \n{}", proof),
         Err(state) => panic!("Did not find proof, state: {:?}", state),
     }
 }

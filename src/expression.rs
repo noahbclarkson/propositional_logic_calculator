@@ -23,7 +23,6 @@ impl Display for Expression {
 }
 
 impl Expression {
-
     pub fn list_expressions(&self) -> Vec<Expression> {
         // Get all the nested expressions in a list
         let mut expressions = Vec::new();
@@ -32,26 +31,25 @@ impl Expression {
                 expressions.push(Expression::And(left.clone(), right.clone()));
                 expressions.extend(left.list_expressions());
                 expressions.extend(right.list_expressions());
-            },
+            }
             Expression::Or(left, right) => {
                 expressions.push(Expression::Or(left.clone(), right.clone()));
                 expressions.extend(left.list_expressions());
                 expressions.extend(right.list_expressions());
-            },
+            }
             Expression::Implies(left, right) => {
                 expressions.push(Expression::Implies(left.clone(), right.clone()));
                 expressions.extend(left.list_expressions());
                 expressions.extend(right.list_expressions());
-            },
+            }
             Expression::Not(expr) => {
                 expressions.push(Expression::Not(expr.clone()));
                 expressions.extend(expr.list_expressions());
-            },
+            }
             Expression::Var(_) => expressions.push(self.clone()),
         }
         // Remove duplicates
         expressions.dedup();
         expressions
     }
-
 }

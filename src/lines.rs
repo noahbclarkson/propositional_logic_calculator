@@ -6,7 +6,15 @@ use std::{
 
 use enum_iterator::Sequence;
 
-use crate::{expression::Expression, proof::Proof};
+use crate::{
+    expression::Expression,
+    proof::{Proof, SearchNode, SearchSettings},
+};
+
+const INNER_SEARCH_SETTINGS: SearchSettings = SearchSettings {
+    max_line_length: 6,
+    iterations: 10000,
+};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Line {
@@ -33,41 +41,13 @@ impl Line {
             deduction_lines,
         }
     }
-}
 
-impl Line {
     pub fn matching_expressions(&self, other: &Line) -> bool {
         self.expression == other.expression
     }
-}
 
-impl Display for Line {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Assumption lines should be displayed as a comma separated list first, then the line number in brackets, then the rule used, then the deduction lines
-        let assumption_lines = self
-            .assumption_lines
-            .iter()
-            .map(|x| x + 1)
-            .map(|x| x.to_string())
-            .collect::<Vec<String>>()
-            .join(", ");
-        let deduction_lines = self
-            .deduction_lines
-            .iter()
-            .map(|x| x + 1)
-            .map(|x| x.to_string())
-            .collect::<Vec<String>>()
-            .join(", ");
-
-        write!(
-            f,
-            "{} ({}) {} {} {}",
-            assumption_lines,
-            self.line_number + 1,
-            self.expression,
-            self.rule,
-            deduction_lines
-        )
+    pub fn matches_expression(&self, expression: &Expression) -> bool {
+        self.expression == *expression
     }
 }
 
@@ -82,77 +62,8 @@ pub enum Rule {
     AndElimination,
     OrIntroduction,
     OrElimination,
+    OrEliminationAssumption,
     ReductioAdAbsurdium,
-}
-
-pub struct ProofState {
-    pub lines: Vec<Line>,
-    pub conclusion: Expression,
-    iter_i: usize,
-    iter_j: usize,
-}
-
-impl ProofState {
-    pub fn new(lines: Vec<Line>, conclusion: Expression) -> Self {
-        ProofState {
-            lines,
-            conclusion,
-            iter_i: 0,
-            iter_j: 0,
-        }
-    }
-
-    fn get_i_line(&self) -> &Line {
-        &self.lines[self.iter_i]
-    }
-
-    fn get_j_line(&self) -> &Line {
-        &self.lines[self.iter_j]
-    }
-
-    fn find_vars(&self) -> Vec<String> {
-        let mut found_vars = Vec::new();
-        for line in self.lines.iter() {
-            let expressions = line.expression.list_expressions();
-            for expression in expressions {
-                match expression {
-                    Expression::Var(var) => {
-                        if !found_vars.contains(&var) {
-                            found_vars.push(var);
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-        let expressions = self.conclusion.list_expressions();
-        for expression in expressions {
-            match expression {
-                Expression::Var(var) => {
-                    if !found_vars.contains(&var) {
-                        found_vars.push(var);
-                    }
-                }
-                _ => {}
-            }
-        }
-        found_vars
-    }
-}
-
-pub fn possible_lines(state: ProofState, rule: Rule) -> Vec<Line> {
-    match rule {
-        Rule::Assumption => panic!("Assumption rule does not have possible lines"),
-        Rule::ModusPonens => find_possible_of_type(state, possible_mp, rule),
-        Rule::ModusTollens => find_possible_of_type(state, possible_mt, rule),
-        Rule::ConditionalProof => todo!(),
-        Rule::DoubleNegation => find_possible_of_type(state, possible_dn, rule),
-        Rule::AndIntroduction => find_possible_of_type(state, possible_and_i, rule),
-        Rule::AndElimination => find_possible_of_type(state, possible_and_e, rule),
-        Rule::OrIntroduction => find_possible_of_type(state, possible_or_i, rule),
-        Rule::OrElimination => find_possible_of_type(state, possible_or_e, rule),
-        Rule::ReductioAdAbsurdium => todo!(),
-    }
 }
 
 impl Display for Rule {
@@ -167,265 +78,389 @@ impl Display for Rule {
             Rule::AndElimination => write!(f, "&E"),
             Rule::OrIntroduction => write!(f, "vI"),
             Rule::OrElimination => write!(f, "vE"),
+            Rule::OrEliminationAssumption => write!(f, "A(vE)"),
             Rule::ReductioAdAbsurdium => write!(f, "RAA"),
         }
     }
 }
 
-fn find_possible_of_type<F>(mut state: ProofState, validator: F, rule: Rule) -> Vec<Line>
-where
-    F: Fn(&ProofState) -> Vec<Line>,
-{
-    let mut possibles = Vec::new();
-    let length = state.lines.len();
-    for i in 0..length {
-        for j in 0..length {
-            state.iter_i = i;
-            state.iter_j = j;
-            let lines = validator(&state);
-            for line in lines {
-                let line = Line::new(
-                    get_assumption_line_numbers(state.lines.clone(), line.deduction_lines.clone()),
-                    length,
-                    line.expression,
-                    rule.clone(),
-                    line.deduction_lines,
-                );
-                possibles.push(line);
-            }
-        }
-    }
-    possibles.dedup();
-    possibles
+#[derive(Debug, Clone)]
+pub struct PossibleFinder {
+    node: Box<SearchNode>,
+    possibles: Vec<Possible>,
+    vars: Vec<String>,
 }
 
-fn possible_mp(state: &ProofState) -> Vec<Line> {
-    match state.get_i_line().expression.clone() {
-        Expression::Implies(left, right) => match *left == state.get_j_line().expression {
-            true => {
-                let deduction_lines = vec![state.iter_i, state.iter_j];
-                return vec![Line::new(
-                    vec![],
-                    0,
-                    (*right).clone(),
+impl PossibleFinder {
+    pub fn new(node: SearchNode) -> Self {
+        let possibles = vec![];
+        PossibleFinder {
+            node: Box::new(node),
+            possibles,
+            vars: vec![],
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.node.lines.len()
+    }
+
+    fn find_vars(&self) -> Vec<String> {
+        let mut found_vars = Vec::new();
+        for line in self.node.lines.iter() {
+            find_vars_for_expression(&line.expression, &mut found_vars);
+        }
+        find_vars_for_expression(&self.node.conclusion, &mut found_vars);
+        found_vars
+    }
+
+    pub fn possibles(&self) -> &Vec<Possible> {
+        &self.possibles
+    }
+
+    pub fn find(&mut self) {
+        self.vars = self.find_vars();
+        self.possible_mp();
+        self.possible_mt();
+        self.possible_and_e();
+        self.possible_and_i();
+        self.possible_or_i();
+        self.possible_or_i_with_vars();
+        self.possible_dn_remove();
+        self.possible_dn_add();
+        self.possible_or_e();
+    }
+
+    pub fn add_possible(&mut self, possible: Possible) {
+        self.possibles.push(possible);
+    }
+
+    fn assumption_line_nums(&self, deduction_lines: Vec<usize>) -> Vec<usize> {
+        let lines = deduction_lines
+            .iter()
+            .map(|x| self.node.lines.get(*x))
+            .collect::<Vec<Option<&Line>>>();
+        // Flatten to get all valid lines, sort and dedup
+        let mut assumption_lines = lines
+            .iter()
+            .filter(|x| x.is_some())
+            .map(|x| x.unwrap())
+            .map(|x| x.assumption_lines.clone())
+            .flatten()
+            .collect::<Vec<usize>>();
+        assumption_lines.sort();
+        assumption_lines.dedup();
+        assumption_lines
+    }
+
+    fn possible_mp(&mut self) {
+        for ab in self.clone().iterate_lines_in_dimension(2) {
+            // If the first line is an implication
+            if let Expression::Implies(left, right) = &ab[0].expression {
+                // If the second line matches the left side of the implication
+                if !ab[1].matches_expression(&left) {
+                    continue;
+                }
+                let deductions = vec![ab[0].line_number, ab[1].line_number];
+                let assumptions = self.assumption_line_nums(deductions.clone());
+                let possible = Possible::new_single(Line::new(
+                    assumptions,
+                    self.len(),
+                    right.as_ref().clone(),
                     Rule::ModusPonens,
-                    deduction_lines,
-                )];
+                    deductions,
+                ));
+                self.add_possible(possible);
             }
-            false => vec![],
-        },
-        _ => vec![],
-    }
-}
-
-fn possible_mt(state: &ProofState) -> Vec<Line> {
-    match state.get_i_line().expression.clone() {
-        Expression::Implies(left, right) => match state.get_j_line().expression.clone() {
-            Expression::Not(inner) => match *right == *inner {
-                true => {
-                    let expression = Expression::Not(left);
-                    let deduction_lines = vec![state.iter_i, state.iter_j];
-                    return vec![Line::new(
-                        vec![],
-                        0,
-                        expression,
-                        Rule::ModusTollens,
-                        deduction_lines,
-                    )];
-                }
-                false => vec![],
-            },
-            _ => vec![],
-        },
-        _ => vec![],
-    }
-}
-
-fn possible_and_e(state: &ProofState) -> Vec<Line> {
-    match state.get_i_line().expression.clone() {
-        Expression::And(left, right) => {
-            let deduction_lines = vec![state.iter_i];
-            return vec![
-                Line::new(
-                    vec![],
-                    0,
-                    (*left).clone(),
-                    Rule::AndElimination,
-                    deduction_lines.clone(),
-                ),
-                Line::new(
-                    vec![],
-                    0,
-                    (*right).clone(),
-                    Rule::AndElimination,
-                    deduction_lines,
-                ),
-            ];
         }
-        _ => vec![],
     }
-}
 
-fn possible_dn(state: &ProofState) -> Vec<Line> {
-    let mut lines = Vec::new();
-    let dn_removal = match state.get_i_line().expression.clone() {
-        Expression::Not(inner) => match (*inner).clone() {
-            Expression::Not(inner) => {
-                let deduction_lines = vec![state.iter_i];
-                Some(Line::new(
-                    vec![],
-                    0,
-                    (*inner).clone(),
-                    Rule::DoubleNegation,
-                    deduction_lines,
-                ))
+    fn possible_mt(&mut self) {
+        for ab in self.clone().iterate_lines_in_dimension(2) {
+            // If the first line is an implication
+            if let Expression::Implies(left, right) = &ab[0].expression {
+                // If the second line is a negation of the right side of the implication
+                if !ab[1].matches_expression(&Expression::Not(right.clone())) {
+                    continue;
+                }
+                let deductions = vec![ab[0].line_number, ab[1].line_number];
+                let assumptions = self.assumption_line_nums(deductions.clone());
+                let possible = Possible::new_single(Line::new(
+                    assumptions,
+                    self.len(),
+                    Expression::Not(Rc::new(left.as_ref().clone())),
+                    Rule::ModusTollens,
+                    deductions,
+                ));
+                self.add_possible(possible);
             }
-            _ => None,
-        },
-        _ => None,
-    };
-    match dn_removal {
-        Some(line) => lines.push(line),
-        None => {}
+        }
     }
-    let deduction_lines = vec![state.iter_i];
-    lines.push(Line::new(
-        vec![],
-        0,
-        Expression::Not(Rc::new(Expression::Not(Rc::new(
-            state.get_i_line().expression.clone(),
-        )))),
-        Rule::DoubleNegation,
-        deduction_lines,
-    ));
-    lines
-}
 
-fn possible_and_i(state: &ProofState) -> Vec<Line> {
-    let deduction_lines = vec![state.iter_i, state.iter_j];
-    vec![Line::new(
-        vec![],
-        0,
-        Expression::And(
-            Rc::new(state.get_i_line().expression.clone()),
-            Rc::new(state.get_j_line().expression.clone()),
-        ),
-        Rule::AndIntroduction,
-        deduction_lines,
-    )]
-}
-
-fn possible_or_i(state: &ProofState) -> Vec<Line> {
-    let mut deduction_lines = vec![state.iter_i, state.iter_j];
-    let mut or_with_existing = vec![
-        Line::new(
-            vec![],
-            0,
-            Expression::Or(
-                Rc::new(state.get_i_line().expression.clone()),
-                Rc::new(state.get_j_line().expression.clone()),
-            ),
-            Rule::OrIntroduction,
-            deduction_lines.clone(),
-        ),
-        Line::new(
-            vec![],
-            0,
-            Expression::Or(
-                Rc::new(state.get_j_line().expression.clone()),
-                Rc::new(state.get_i_line().expression.clone()),
-            ),
-            Rule::OrIntroduction,
-            deduction_lines,
-        ),
-    ];
-    // Add new lines that are line_1 v A..Z where A..Z are all variables that occur in the proof and conclusion
-    deduction_lines = vec![state.iter_i];
-    for c in state.find_vars() {
-        let expression = Expression::Or(
-            Rc::new(state.get_i_line().expression.clone()),
-            Rc::new(Expression::Var((c).to_string())),
-        );
-        let line = Line::new(
-            vec![],
-            0,
-            expression,
-            Rule::OrIntroduction,
-            deduction_lines.clone(),
-        );
-        or_with_existing.push(line);
+    fn possible_and_e(&mut self) {
+        for line in self.clone().node.lines.iter() {
+            // If the line is an and expression
+            if let Expression::And(left, right) = &line.expression {
+                let deductions = vec![line.line_number];
+                let assumptions = self.assumption_line_nums(deductions.clone());
+                let line = Line::new(
+                    assumptions,
+                    self.len(),
+                    left.as_ref().clone(),
+                    Rule::AndElimination,
+                    deductions,
+                );
+                let mut line2 = line.clone();
+                line2.expression = right.as_ref().clone();
+                let possibles = vec![Possible::new_single(line), Possible::new_single(line2)];
+                self.possibles.extend(possibles);
+            }
+        }
     }
-    or_with_existing.dedup();
-    or_with_existing
-}
 
-fn possible_or_e(state: &ProofState) -> Vec<Line> {
-    let mut lines = Vec::new();
-    match state.get_i_line().expression.clone() {
-        Expression::Or(left, right) => {
-            // If the lines contain an or elimination already, we don't want to add another one
-            let mut or_elimination = false;
-            for line in state.lines.iter() {
-                if line.rule == Rule::OrElimination {
-                    or_elimination = true;
+    fn possible_dn_remove(&mut self) {
+        for line in self.clone().node.lines.iter() {
+            // If the line is a double negation
+            if let Expression::Not(inner) = &line.expression {
+                if let Expression::Not(inner2) = &inner.as_ref() {
+                    let deductions = vec![line.line_number];
+                    let assumptions = self.assumption_line_nums(deductions.clone());
+                    let possible = Possible::new_single(Line::new(
+                        assumptions,
+                        self.len(),
+                        inner2.as_ref().clone(),
+                        Rule::DoubleNegation,
+                        deductions,
+                    ));
+                    self.add_possible(possible);
                 }
             }
-            if or_elimination {
-                return lines;
-            }
-            // Now we want to conduct two proofs to see if the conclusion is true for both
-            let mut starting_lines_1 = state.lines.clone();
-            starting_lines_1.push(Line::new(
-                vec![state.lines.len()],
-                state.lines.len(),
-                (*left).clone(),
-                Rule::OrElimination,
-                vec![state.iter_i],
-            ));
-            let mut proof1 =
-                Proof::new_raw(vec![], state.conclusion.clone(), starting_lines_1, None);
-            match proof1.search() {
-                Ok(_) => (),
-                Err(_) => return lines,
-            };
-            let mut starting_lines_2 = state.lines.clone();
-            starting_lines_2.push(Line::new(
-                vec![state.lines.len()],
-                state.lines.len(),
-                (*right).clone(),
-                Rule::OrElimination,
-                vec![state.iter_i],
-            ));
-            let mut proof2 =
-                Proof::new_raw(vec![], state.conclusion.clone(), starting_lines_2, None);
-            match proof2.search() {
-                Ok(_) => (),
-                Err(_) => return lines,
-            };
-            let deduction_lines = vec![state.iter_i];
-            lines.push(Line::new(
-                vec![state.iter_i],
-                0,
-                state.conclusion.clone(),
-                Rule::OrElimination,
-                deduction_lines,
-            ));
         }
-        _ => {}
     }
-    lines
+
+    fn possible_dn_add(&mut self) {
+        for line in self.clone().node.lines.iter() {
+            let deductions = vec![line.line_number];
+            let assumptions = self.assumption_line_nums(deductions.clone());
+            let possible = Possible::new_single(Line::new(
+                assumptions,
+                self.len(),
+                Expression::Not(Rc::new(Expression::Not(Rc::new(line.expression.clone())))),
+                Rule::DoubleNegation,
+                deductions,
+            ));
+            self.add_possible(possible);
+        }
+    }
+
+    fn possible_and_i(&mut self) {
+        for ab in self.clone().iterate_lines_in_dimension(2) {
+            let deductions = vec![ab[0].line_number, ab[1].line_number];
+            let assumptions = self.assumption_line_nums(deductions.clone());
+            let possible = Possible::new_single(Line::new(
+                assumptions,
+                self.len(),
+                Expression::And(
+                    Rc::new(ab[0].expression.clone()),
+                    Rc::new(ab[1].expression.clone()),
+                ),
+                Rule::AndIntroduction,
+                deductions,
+            ));
+            self.add_possible(possible);
+        }
+    }
+
+    fn possible_or_i(&mut self) {
+        for ab in self.clone().iterate_lines_in_dimension(2) {
+            let deductions = vec![ab[0].line_number, ab[1].line_number];
+            let assumptions = self.assumption_line_nums(deductions.clone());
+            let possible = Possible::new_single(Line::new(
+                assumptions,
+                self.len(),
+                Expression::Or(
+                    Rc::new(ab[0].expression.clone()),
+                    Rc::new(ab[1].expression.clone()),
+                ),
+                Rule::OrIntroduction,
+                deductions,
+            ));
+            self.add_possible(possible);
+        }
+    }
+
+    fn possible_or_i_with_vars(&mut self) {
+        for line in self.node.lines.iter() {
+            let vars = self.vars.clone();
+            for c in vars {
+                let deductions = vec![line.line_number];
+                let assumptions = self.assumption_line_nums(deductions.clone());
+                let line = Line::new(
+                    assumptions,
+                    self.len(),
+                    Expression::Or(
+                        Rc::new(line.expression.clone()),
+                        Rc::new(Expression::Var(c.clone())),
+                    ),
+                    Rule::OrIntroduction,
+                    deductions,
+                );
+                let mut line2 = line.clone();
+                line2.expression = Expression::Or(
+                    Rc::new(Expression::Var(c.clone())),
+                    Rc::new(line.expression.clone()),
+                );
+                let possibles = vec![Possible::new_single(line), Possible::new_single(line2)];
+                self.possibles.extend(possibles);
+            }
+        }
+    }
+
+    fn possible_or_e(&mut self) {
+        for line in self.clone().node.lines.iter() {
+            // If the line is an or expression
+            if let Expression::Or(left, right) = &line.expression {
+                let mut a_lines = self.node.lines.clone();
+                let line = Line::new(
+                    vec![line.line_number],
+                    self.len(),
+                    left.as_ref().clone(),
+                    Rule::OrEliminationAssumption,
+                    vec![line.line_number],
+                );
+                a_lines.push(line.clone());
+                // Try to contruct a proof for the conclusion using the new assumption (a)
+                let mut a_proof = Proof::new_raw(
+                    self.node.assumptions().clone(),
+                    self.node.conclusion.clone(),
+                    a_lines,
+                    Some(INNER_SEARCH_SETTINGS),
+                );
+                let a_result = a_proof.search();
+                match a_result {
+                    Ok(_) => (),
+                    Err(_) => continue,
+                }
+                let mut line_b = line.clone();
+                line_b.expression = right.as_ref().clone();
+                let mut b_lines = self.node.lines.clone();
+                b_lines.push(line_b);
+                // Try to contruct a proof for the conclusion using the new assumption (b)
+                let mut b_proof = Proof::new_raw(
+                    self.node.assumptions().clone(),
+                    self.node.conclusion.clone(),
+                    b_lines,
+                    Some(INNER_SEARCH_SETTINGS),
+                );
+                let b_result = b_proof.search();
+                match b_result {
+                    Ok(_) => (),
+                    Err(_) => continue,
+                }
+                let a_deductions_lines = a_proof.get_deduction_lines();
+                // Add the lines from this proof
+                let mut resulting_lines = Vec::new();
+                for l in a_deductions_lines.clone() {
+                    resulting_lines.push(l.clone());
+                }
+                // Add the lines from the second proof
+                let b_deductions_lines = b_proof.get_deduction_lines();
+                for l in b_deductions_lines.clone() {
+                    let mut l = l.clone();
+                    l.line_number += a_deductions_lines.len();
+                    resulting_lines.push(l);
+                }
+                let mut deductions = vec![line.line_number];
+                // Add all the lines from the proofs
+                for l in resulting_lines.clone() {
+                    deductions.push(l.line_number);
+                }
+                // To get the assumptions we can just input the deductions into the assumption_line_nums function
+                // We need to look at all of the new lines and get their assumptions
+                let mut assumptions = self.assumption_line_nums(deductions.clone());
+                // Add the assumption from the first proof
+                for l in resulting_lines.clone() {
+                    for a in l.assumption_lines {
+                        if !assumptions.contains(&a) {
+                            assumptions.push(a);
+                        }
+                    }
+                }
+
+                let final_line = Line::new(
+                    assumptions,
+                    self.len() + resulting_lines.len(),
+                    self.node.conclusion.clone(),
+                    Rule::OrElimination,
+                    deductions,
+                );
+                resulting_lines.push(final_line);
+                let possible = Possible::new(resulting_lines);
+                self.add_possible(possible);
+            }
+        }
+    }
+
+    fn iterate_lines_in_dimension(&self, dimension: usize) -> impl Iterator<Item = Vec<&Line>> {
+        // Create an array to store the current indices for each dimension.
+        let mut indices = vec![0; dimension];
+        let mut is_done = false;
+
+        std::iter::from_fn(move || {
+            if is_done {
+                return None;
+            }
+
+            // Map the current indices to the corresponding lines.
+            let result = indices
+                .iter()
+                .map(|&index| &self.node.lines[index])
+                .collect::<Vec<&Line>>();
+
+            // Increment indices to get the next combination.
+            for i in 0..dimension {
+                if indices[i] < self.node.lines.len() - 1 {
+                    // Increment this index and reset all previous indices to 0.
+                    indices[i] += 1;
+                    for j in 0..i {
+                        indices[j] = 0;
+                    }
+                    return Some(result);
+                }
+            }
+
+            // If all combinations have been generated, mark as done.
+            is_done = true;
+            Some(result)
+        })
+    }
 }
 
-fn get_assumption_line_numbers(
-    antecedent_lines: Vec<Line>,
-    deduction_lines: Vec<usize>,
-) -> Vec<usize> {
-    let lines = deduction_lines
-        .iter()
-        .map(|x| antecedent_lines[*x].clone().assumption_lines)
-        .collect::<Vec<Vec<usize>>>();
-    let mut lines = lines.iter().flatten().map(|x| *x).collect::<Vec<usize>>();
-    lines.sort();
-    lines.dedup();
-    lines
+#[derive(Debug, PartialEq, Clone)]
+pub struct Possible {
+    pub lines: Vec<Line>,
+}
+
+impl Possible {
+    pub fn new(lines: Vec<Line>) -> Self {
+        Possible { lines }
+    }
+
+    pub fn new_single(line: Line) -> Self {
+        Possible { lines: vec![line] }
+    }
+}
+
+fn find_vars_for_expression(expression: &Expression, vars: &mut Vec<String>) {
+    let expressions = expression.list_expressions();
+    for expression in expressions {
+        match expression {
+            Expression::Var(var) => {
+                if !vars.contains(&var) {
+                    vars.push(var);
+                }
+            }
+            _ => {}
+        }
+    }
 }
