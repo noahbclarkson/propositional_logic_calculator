@@ -2,11 +2,19 @@ use std::{iter::Peekable, rc::Rc, str::Chars};
 
 use crate::{error::ParserError, expression::Expression};
 
+/// The `Parser` struct is responsible for parsing logical expressions represented as strings into an abstract syntax tree (AST).
+/// It works with basic logical operators and handles nested expressions.
 pub struct Parser<'a> {
+    // Stream of characters from the input string to be parsed.
     chars: Peekable<Chars<'a>>,
 }
 
 impl<'a> Parser<'a> {
+    /// Creates a new instance of `Parser`.
+    ///
+    /// # Arguments
+    ///
+    /// * `input`: A string slice representing the logical expression to be parsed.
     pub fn new(input: &'a str) -> Self {
         Parser {
             chars: input.chars().peekable(),
@@ -61,22 +69,60 @@ impl<'a> Parser<'a> {
         stack.pop().ok_or_else(|| ParserError::EmptyExpression)
     }
 
+    /// Handles the opening parenthesis by parsing the content within brackets.
+    ///
+    /// # Arguments
+    ///
+    /// * `stack`: A mutable reference to a vector of `Expression` objects representing the current state of the parser.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ParserError` if the bracketed content is not a valid expression or if parentheses are unmatched.
     fn handle_parenthesis(&mut self, stack: &mut Vec<Expression>) -> Result<(), ParserError> {
         let bracket = self.extract_bracket_contents()?;
         stack.push(Parser::new(&bracket).parse()?);
         Ok(())
     }
 
+    /// Handles a variable character by adding it to the parser stack as an `Expression::Var`.
+    ///
+    /// # Arguments
+    ///
+    /// * `stack`: Mutable reference to the parser stack.
+    /// * `c`: The character representing the variable.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if successfully handled, otherwise a `ParserError`
     fn handle_variable(&mut self, stack: &mut Vec<Expression>, c: char) -> Result<(), ParserError> {
         stack.push(Expression::Var(c.to_string()));
         Ok(())
     }
 
+    /// Handles negation in an expression.
+    ///
+    /// # Arguments
+    ///
+    /// * `stack`: Mutable reference to the parser stack.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ParserError` if the subsequent expression after negation is invalid.
     fn handle_negation(&mut self, stack: &mut Vec<Expression>) -> Result<(), ParserError> {
         stack.push(self.parse_negation()?);
         Ok(())
     }
 
+    /// Handles binary operators by constructing the appropriate binary expression.
+    ///
+    /// # Arguments
+    ///
+    /// * `stack`: Mutable reference to the parser stack.
+    /// * `operator`: The character representing the binary operator.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ParserError` for invalid binary expressions or missing operands.
     fn handle_binary_operator(
         &mut self,
         stack: &mut Vec<Expression>,
@@ -90,6 +136,11 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    /// Parses a negation operation and returns the corresponding `Expression`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ParserError` if the negation is not followed by a valid expression.
     fn parse_negation(&mut self) -> Result<Expression, ParserError> {
         let next = self
             .chars
@@ -105,6 +156,16 @@ impl<'a> Parser<'a> {
         Ok(Expression::Not(Rc::new(right)))
     }
 
+    /// Parses a binary operation (AND, OR, IMPLIES) and returns the corresponding `Expression`.
+    ///
+    /// # Arguments
+    ///
+    /// * `operator`: Character representing the binary operator.
+    /// * `left`: The left operand of the binary operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ParserError` for invalid operators or if the right operand is missing.
     fn parse_binary_operation(
         &mut self,
         operator: char,
@@ -122,12 +183,18 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
+    /// Consumes and ignores any whitespace characters in the current parsing context.
     fn consume_whitespace(&mut self) {
         while let Some(&' ') = self.chars.peek() {
             self.chars.next();
         }
     }
 
+    /// Extracts the contents within a pair of matching parentheses.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ParserError` if the parentheses are unmatched.
     fn extract_bracket_contents(&mut self) -> Result<String, ParserError> {
         let mut bracket = String::new();
         let mut bracket_count = 1;
