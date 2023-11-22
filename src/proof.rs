@@ -1,4 +1,7 @@
-use crate::{lines::{possible_lines, Line, Rule}, error::{ParserError, ProofError}};
+use crate::{
+    error::{ParserError, ProofError},
+    lines::{possible_lines, Line, ProofState, Rule},
+};
 use derive_builder::Builder;
 use enum_iterator::all;
 use std::{
@@ -12,8 +15,8 @@ use std::{
 
 use crate::{expression::Expression, parser::Parser};
 
-const DEFAULT_MAX_LINE_LENGTH: usize = 6;
-const DEFAULT_ITERATIONS: usize = 10000;
+const DEFAULT_MAX_LINE_LENGTH: usize = 10;
+const DEFAULT_ITERATIONS: usize = 20000;
 
 static ITERATIONS: AtomicUsize = AtomicUsize::new(0);
 
@@ -65,6 +68,22 @@ pub struct SearchNode {
 }
 
 impl Proof {
+    pub(crate) fn new_raw(
+        assumptions: Vec<Expression>,
+        conclusion: Expression,
+        lines: Vec<Line>,
+        settings: Option<SearchSettings>,
+    ) -> Self {
+        Proof {
+            assumptions,
+            conclusion,
+            lines,
+            settings: Rc::new(
+                settings.unwrap_or_else(|| SearchSettingsBuilder::default().build().unwrap()),
+            ),
+        }
+    }
+
     pub fn new(
         assumptions: Vec<String>,
         conclusion: String,
@@ -144,9 +163,15 @@ impl SearchNode {
             .skip(1)
             // TODO: Implement these rules
             .filter(|x| {
-                x.clone() != Rule::ConditionalProof && x.clone() != Rule::ReductioAdAbsurdium && x.clone() != Rule::OrElimination
+                x.clone() != Rule::ConditionalProof
+                && x.clone() != Rule::ReductioAdAbsurdium
             })
-            .flat_map(|x| possible_lines(self.lines.clone(), x))
+            .flat_map(|x| {
+                possible_lines(
+                    ProofState::new(self.lines.clone(), self.conclusion.clone()),
+                    x,
+                )
+            })
             .collect::<Vec<Line>>()
     }
 }
@@ -171,6 +196,17 @@ fn search(head: Rc<RefCell<SearchNode>>) -> Result<Vec<Line>, ProofError> {
         }
 
         let possibles = current.find_possible_lines();
+        for possible in possibles.clone() {
+            match possible.expression == current.conclusion {
+                true =>  {
+                    let mut new_lines = current.lines.clone();
+                    new_lines.push(possible);
+                    return Ok(new_lines);
+                }
+                false => (),
+                
+            }
+        }
         for possible_line in possibles {
             let mut new_lines = current.lines.clone();
             new_lines.push(possible_line);

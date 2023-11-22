@@ -37,3 +37,17 @@ fn test_disjunction_introduction() {
     create_and_test_proof(vec!["P"], "PvQ");
 }
 
+#[test]
+fn test_disjunction_elimination() {
+    create_and_test_proof(vec!["PvQ", "P>W", "Q>W"], "W");
+}
+
+#[test]
+fn test_double_negation() {
+    create_and_test_proof(vec!["P"], "-(-P)");
+}
+
+#[test]
+fn test_double_negation_reverse() {
+    create_and_test_proof(vec!["-(-P)"], "P");
+}
