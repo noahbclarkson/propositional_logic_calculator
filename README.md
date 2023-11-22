@@ -42,6 +42,35 @@ fn main() {
 }
 ```
 
+## Example
+
+The propositional_logic_calculator project can be interactively used to compute proofs for propositional logic statements. When the project is run, it prompts the user to enter a propositional logic statement. Upon entering a valid statement, the program computes and displays a proof for the given statement.
+
+Interactive Usage Example
+When you run the project, it asks for a propositional logic statement in the format `Assumptions/Conclusion`. Here's an example of how this interaction works:
+
+```bash
+Enter the propositional logic statement:
+PvQ,P>W,Q>W/W
+```
+
+```bash
+Found proof: 
+Assumptions: [(P v Q), (P -> W), (Q -> W)]
+Conclusion: W
+Total Proof Steps: 8
+Proof Steps:
+Line 1: (P v Q) [1] using Assumption
+Line 2: (P -> W) [2] using Assumption
+Line 3: (Q -> W) [3] using Assumption
+    Line 4: P [1] using Or Elimination Assumption from lines 1
+     Line 5: W [1, 2] using Modus Ponens from lines 2, 4
+    Line 6: Q [1] using Or Elimination Assumption from lines 1
+     Line 7: W [1, 3] using Modus Ponens from lines 3, 6
+Line 8: W [1, 2, 3] using Or Elimination from lines 4, 5, 6, 7
+
+```
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
