@@ -5,6 +5,7 @@ use std::{
 };
 
 use enum_iterator::Sequence;
+use rand::Rng;
 
 use crate::{
     expression::Expression,
@@ -12,8 +13,8 @@ use crate::{
 };
 
 const INNER_SEARCH_SETTINGS: SearchSettings = SearchSettings {
-    max_line_length: 6,
-    iterations: 10000,
+    max_line_length: 15,
+    iterations: 50000,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -129,6 +130,14 @@ impl PossibleFinder {
         self.possible_dn_remove();
         self.possible_dn_add();
         self.possible_or_e();
+        // Check if an expression already exists in the proof (it is useless to add it again)
+        self.possibles.retain(|x| {
+            !self
+                .node
+                .lines
+                .iter()
+                .any(|y| x.lines.iter().any(|z| z.expression == y.expression))
+        });
     }
 
     pub fn add_possible(&mut self, possible: Possible) {
@@ -317,6 +326,15 @@ impl PossibleFinder {
     }
 
     fn possible_or_e(&mut self) {
+        // If the a line already contains an orEliminationAssumption, we can't add another one or we'll end up in an infinite loop
+        if self
+            .node
+            .lines
+            .iter()
+            .any(|x| x.rule == Rule::OrEliminationAssumption)
+        {
+            return;
+        }
         for line in self.clone().node.lines.iter() {
             // If the line is an or expression
             if let Expression::Or(left, right) = &line.expression {
@@ -330,44 +348,34 @@ impl PossibleFinder {
                 );
                 a_lines.push(line.clone());
                 // Try to contruct a proof for the conclusion using the new assumption (a)
-                let mut a_proof = Proof::new_raw(
-                    self.node.assumptions().clone(),
-                    self.node.conclusion.clone(),
-                    a_lines,
-                    Some(INNER_SEARCH_SETTINGS),
-                );
-                let a_result = a_proof.search();
-                match a_result {
-                    Ok(_) => (),
+                let a_deduction_lines = match self.search_sub_proof(a_lines) {
+                    Ok(lines) => lines,
                     Err(_) => continue,
-                }
+                };
                 let mut line_b = line.clone();
                 line_b.expression = right.as_ref().clone();
                 let mut b_lines = self.node.lines.clone();
                 b_lines.push(line_b);
                 // Try to contruct a proof for the conclusion using the new assumption (b)
-                let mut b_proof = Proof::new_raw(
-                    self.node.assumptions().clone(),
-                    self.node.conclusion.clone(),
-                    b_lines,
-                    Some(INNER_SEARCH_SETTINGS),
-                );
-                let b_result = b_proof.search();
-                match b_result {
-                    Ok(_) => (),
+                let b_deduction_lines = match self.search_sub_proof(b_lines) {
+                    Ok(lines) => lines,
                     Err(_) => continue,
-                }
-                let a_deductions_lines = a_proof.get_deduction_lines();
+                };
                 // Add the lines from this proof
                 let mut resulting_lines = Vec::new();
-                for l in a_deductions_lines.clone() {
+                for l in a_deduction_lines.clone() {
                     resulting_lines.push(l.clone());
                 }
                 // Add the lines from the second proof
-                let b_deductions_lines = b_proof.get_deduction_lines();
-                for l in b_deductions_lines.clone() {
+                for l in b_deduction_lines.clone() {
                     let mut l = l.clone();
-                    l.line_number += a_deductions_lines.len();
+                    for d in l.deduction_lines.iter_mut() {
+                        if *d >= self.len() {
+                            *d += a_deduction_lines.len();
+                        }
+                        
+                    }
+                    l.line_number += a_deduction_lines.len();
                     resulting_lines.push(l);
                 }
                 let mut deductions = vec![line.line_number];
@@ -398,6 +406,22 @@ impl PossibleFinder {
                 let possible = Possible::new(resulting_lines);
                 self.add_possible(possible);
             }
+        }
+    }
+
+    fn search_sub_proof(&self, lines: Vec<Line>) -> Result<Vec<Line>, ()> {
+        let mut proof = Proof::new_raw(
+            self.node.assumptions().clone(),
+            self.node.conclusion.clone(),
+            lines,
+            Some(INNER_SEARCH_SETTINGS),
+        );
+        let result = proof.search();
+        print!("Inner proof: {}", proof);
+        println!("Inner proof result: {:?}", result);
+        match result {
+            Ok(_) => Ok(proof.get_deduction_lines()),
+            Err(_) => Err(()),
         }
     }
 

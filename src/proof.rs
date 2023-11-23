@@ -8,16 +8,12 @@ use std::{
     collections::VecDeque,
     fmt::{self, Display},
     rc::Rc,
-    sync::atomic::AtomicUsize,
-    sync::atomic::Ordering::SeqCst,
 };
 
 use crate::{expression::Expression, parser::Parser};
 
 const DEFAULT_MAX_LINE_LENGTH: usize = 6;
 const DEFAULT_ITERATIONS: usize = 10000;
-
-static ITERATIONS: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Debug, Clone, Builder)]
 pub struct SearchSettings {
@@ -33,6 +29,7 @@ pub struct Proof {
     conclusion: Expression,
     pub(crate) lines: Vec<Line>,
     settings: Rc<SearchSettings>,
+    iterations: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -81,6 +78,7 @@ impl Proof {
             settings: Rc::new(
                 settings.unwrap_or_else(|| SearchSettingsBuilder::default().build().unwrap()),
             ),
+            iterations: 0,
         }
     }
 
@@ -102,6 +100,7 @@ impl Proof {
             settings: Rc::new(
                 settings.unwrap_or_else(|| SearchSettingsBuilder::default().build().unwrap()),
             ),
+            iterations: 0,
         })
     }
 
@@ -111,8 +110,8 @@ impl Proof {
             self.conclusion.clone(),
             self.settings.clone(),
         );
-        let result = search(head.clone());
-        ITERATIONS.store(0, std::sync::atomic::Ordering::SeqCst);
+        self.iterations = 0;
+        let result = search(head.clone(), self);
         match result {
             Ok(result) => {
                 self.lines = result;
@@ -227,7 +226,7 @@ impl SearchNode {
     }
 }
 
-fn search(head: Rc<RefCell<SearchNode>>) -> Result<Vec<Line>, ProofError> {
+fn search(head: Rc<RefCell<SearchNode>>, proof: &mut Proof) -> Result<Vec<Line>, ProofError> {
     let mut queue = VecDeque::new();
     queue.push_back(head.clone());
     while let Some(current_rc) = queue.pop_front() {
@@ -241,21 +240,21 @@ fn search(head: Rc<RefCell<SearchNode>>) -> Result<Vec<Line>, ProofError> {
             continue;
         }
 
-        ITERATIONS.fetch_add(1, SeqCst);
-        if ITERATIONS.load(SeqCst) > current.settings.iterations {
-            break;
+        proof.iterations += 1;
+        if proof.iterations > proof.settings.iterations {
+            return Err(ProofError::SearchError(SearchState::MaximumIteration));
         }
 
-        let mut finder = PossibleFinder::new(head.borrow().clone());
+        let mut finder = PossibleFinder::new(current.clone());
         finder.find();
+        let possibles = finder.possibles();
+        if possibles.is_empty() {
+            continue;
+        }
 
-        for possible in finder.possibles() {
-            match possible
-                .lines
-                .last()
-                .unwrap()
-                .matches_expression(&current.conclusion)
-            {
+        for possible in possibles {
+            let last = possible.lines.last().unwrap();
+            match last.matches_expression(&current.conclusion) {
                 true => {
                     let mut new_lines = current.lines.clone();
                     new_lines.extend(possible.lines.clone());
@@ -264,7 +263,7 @@ fn search(head: Rc<RefCell<SearchNode>>) -> Result<Vec<Line>, ProofError> {
                 false => (),
             }
         }
-        for possible in finder.possibles() {
+        for possible in possibles {
             let mut new_lines = current.lines.clone();
             new_lines.extend(possible.lines.clone());
             let new_node = SearchNode::new(
@@ -281,7 +280,7 @@ fn search(head: Rc<RefCell<SearchNode>>) -> Result<Vec<Line>, ProofError> {
     if current.lines.len() > current.settings.max_line_length {
         return Err(ProofError::SearchError(SearchState::MaximumLines));
     }
-    Err(ProofError::SearchError(SearchState::MaximumIteration))
+    Err(ProofError::SearchError(SearchState::DeadEnd))
 }
 
 pub fn create_assumption_lines(assumptions: Vec<Expression>) -> Vec<Line> {

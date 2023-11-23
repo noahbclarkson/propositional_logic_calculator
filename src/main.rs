@@ -13,7 +13,7 @@ fn main() {
     let assumptions: Vec<String> = assumptions.iter().map(|x| x.to_string()).collect();
     let conclusion = conclusion.to_string();
     let settings = SearchSettingsBuilder::default()
-        .max_line_length(15)
+        .max_line_length(20)
         .iterations(100000)
         .build()
         .unwrap();
