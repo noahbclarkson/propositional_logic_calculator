@@ -70,6 +70,13 @@ Line 4: (R -> W) [4] using A
 Line 10: W [1, 2, 3, 4] using vE from lines 5, 6, 7, 8, 9
 ```
 
+## To Do
+
+- [ ] Conditional Proof
+- [ ] Reductio Ad Absurdum
+- [ ] Parallelism/Concurrency
+- [ ] Improved Proof Selection Strategies
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
