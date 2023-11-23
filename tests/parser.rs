@@ -14,8 +14,8 @@ fn test_parse_and_expression() {
     assert_eq!(
         parser.parse().unwrap(),
         Expression::And(
-            Rc::new(Expression::Var("A".to_string())),
-            Rc::new(Expression::Var("B".to_string()))
+            Expression::Var("A".to_string()).wrap(),
+            Expression::Var("B".to_string()).wrap(),
         )
     );
 }
@@ -26,16 +26,16 @@ fn test_parse_or_expression() {
     assert_eq!(
         parser.parse().unwrap(),
         Expression::Or(
-            Rc::new(Expression::Var("A".to_string())),
-            Rc::new(Expression::Var("B".to_string()))
+            Expression::Var("A".to_string()).wrap(),
+            Expression::Var("B".to_string()).wrap(),
         )
     );
     let mut parser = Parser::new("AvB");
     assert_eq!(
         parser.parse().unwrap(),
         Expression::Or(
-            Rc::new(Expression::Var("A".to_string())),
-            Rc::new(Expression::Var("B".to_string()))
+            Expression::Var("A".to_string()).wrap(),
+            Expression::Var("B".to_string()).wrap(),
         )
     );
 }
@@ -45,7 +45,7 @@ fn test_parse_not_expression() {
     let mut parser = Parser::new("-A");
     assert_eq!(
         parser.parse().unwrap(),
-        Expression::Not(Rc::new(Expression::Var("A".to_string())))
+        Expression::Not(Expression::Var("A".to_string()).wrap())
     );
 }
 
@@ -54,10 +54,13 @@ fn test_parse_nested_expression() {
     let mut parser = Parser::new("-(A&B)");
     assert_eq!(
         parser.parse().unwrap(),
-        Expression::Not(Rc::new(Expression::And(
-            Rc::new(Expression::Var("A".to_string())),
-            Rc::new(Expression::Var("B".to_string()))
-        )))
+        Expression::Not(
+            Expression::And(
+                Expression::Var("A".to_string()).wrap(),
+                Expression::Var("B".to_string()).wrap()
+            )
+            .wrap()
+        )
     );
 }
 
@@ -79,8 +82,8 @@ fn test_ingore_invalid_characters() {
     assert_eq!(
         parser.parse().unwrap(),
         Expression::And(
-            Rc::new(Expression::Var("A".to_string())),
-            Rc::new(Expression::Var("B".to_string()))
+            Expression::Var("A".to_string()).wrap(),
+            Expression::Var("B".to_string()).wrap(),
         )
     );
 }
@@ -91,8 +94,8 @@ fn test_ignore_invalid_character_in_brackets() {
     assert_eq!(
         parser.parse().unwrap(),
         Expression::And(
-            Rc::new(Expression::Var("A".to_string())),
-            Rc::new(Expression::Var("B".to_string()))
+            Expression::Var("A".to_string()).wrap(),
+            Expression::Var("B".to_string()).wrap(),
         )
     );
 }
@@ -103,8 +106,8 @@ fn test_deeply_nested_expression() {
     assert_eq!(
         parser.parse().unwrap(),
         Expression::And(
-            Rc::new(Expression::Var("A".to_string())),
-            Rc::new(Expression::Var("B".to_string()))
+            Expression::Var("A".to_string()).wrap(),
+            Expression::Var("B".to_string()).wrap(),
         )
     );
 }

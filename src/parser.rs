@@ -151,7 +151,7 @@ impl<'a> Parser<'a> {
             Expression::Var(next.to_string())
         };
 
-        Ok(Expression::Not(Rc::new(right)))
+        Ok(Expression::Not(right.wrap()))
     }
 
     /// Parses a binary operation (AND, OR, IMPLIES) and returns the corresponding `Expression`.
@@ -173,9 +173,9 @@ impl<'a> Parser<'a> {
         let right = self.parse()?;
 
         let expr = match operator {
-            '&' => Expression::And(Rc::new(left), Rc::new(right)),
-            'v' | '|' => Expression::Or(Rc::new(left), Rc::new(right)),
-            '>' => Expression::Implies(Rc::new(left), Rc::new(right)),
+            '&' => Expression::And(left.wrap(), right.wrap()),
+            'v' | '|' => Expression::Or(left.wrap(), right.wrap()),
+            '>' => Expression::Implies(left.wrap(), right.wrap()),
             _ => return Err(ParserError::InvalidOperator(operator)),
         };
         Ok(expr)

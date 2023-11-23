@@ -143,7 +143,7 @@ impl PossibleFinder {
         });
     }
 
-    pub fn add_possible(&mut self, possible: Possible) {
+    fn add_possible(&mut self, possible: Possible) {
         self.possibles.push(possible);
     }
 
@@ -198,7 +198,7 @@ impl PossibleFinder {
                 let possible = Possible::new_single(Line::new(
                     assumptions,
                     self.len(),
-                    Expression::Not(Rc::new(left.as_ref().clone())),
+                    Expression::Not(left.as_ref().clone().wrap()),
                     Rule::ModusTollens,
                     deductions,
                 ));
@@ -255,7 +255,7 @@ impl PossibleFinder {
             let possible = Possible::new_single(Line::new(
                 assumptions,
                 self.len(),
-                Expression::Not(Rc::new(Expression::Not(Rc::new(line.expression.clone())))),
+                Expression::Not(Expression::Not(line.expression.clone().wrap()).wrap()),
                 Rule::DoubleNegation,
                 deductions,
             ));
@@ -271,8 +271,8 @@ impl PossibleFinder {
                 assumptions,
                 self.len(),
                 Expression::And(
-                    Rc::new(ab[0].expression.clone()),
-                    Rc::new(ab[1].expression.clone()),
+                    ab[0].expression.clone().wrap(),
+                    ab[1].expression.clone().wrap(),
                 ),
                 Rule::AndIntroduction,
                 deductions,
@@ -289,8 +289,8 @@ impl PossibleFinder {
                 assumptions,
                 self.len(),
                 Expression::Or(
-                    Rc::new(ab[0].expression.clone()),
-                    Rc::new(ab[1].expression.clone()),
+                    ab[0].expression.clone().wrap(),
+                    ab[1].expression.clone().wrap(),
                 ),
                 Rule::OrIntroduction,
                 deductions,
@@ -309,16 +309,16 @@ impl PossibleFinder {
                     assumptions,
                     self.len(),
                     Expression::Or(
-                        Rc::new(line.expression.clone()),
-                        Rc::new(Expression::Var(c.clone())),
+                        line.expression.clone().wrap(),
+                        Expression::Var(c.clone()).wrap(),
                     ),
                     Rule::OrIntroduction,
                     deductions,
                 );
                 let mut line2 = line.clone();
                 line2.expression = Expression::Or(
-                    Rc::new(Expression::Var(c.clone())),
-                    Rc::new(line.expression.clone()),
+                    Expression::Var(c.clone()).wrap(),
+                    line.expression.clone().wrap(),
                 );
                 let possibles = vec![Possible::new_single(line), Possible::new_single(line2)];
                 self.possibles.extend(possibles);
