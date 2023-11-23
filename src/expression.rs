@@ -38,20 +38,22 @@ impl Display for Expression {
 impl Expression {
     /// Extracts and lists all unique sub-expressions (including the current one) from this `Expression`.
     /// It traverses the AST recursively to gather all expressions.
-    /// 
+    ///
     /// Returns a `Vec<Expression>` containing all unique expressions found.
     pub fn list_expressions(&self) -> Vec<Expression> {
         let mut expressions = Vec::new();
         match self {
-            Expression::And(left, right) | Expression::Or(left, right) | Expression::Implies(left, right) => {
+            Expression::And(left, right)
+            | Expression::Or(left, right)
+            | Expression::Implies(left, right) => {
                 expressions.push(self.clone());
                 expressions.extend(left.list_expressions());
                 expressions.extend(right.list_expressions());
-            },
+            }
             Expression::Not(expr) => {
                 expressions.push(self.clone());
                 expressions.extend(expr.list_expressions());
-            },
+            }
             Expression::Var(_) => expressions.push(self.clone()),
         }
         expressions.dedup();

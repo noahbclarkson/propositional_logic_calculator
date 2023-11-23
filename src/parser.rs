@@ -66,7 +66,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        stack.pop().ok_or_else(|| ParserError::EmptyExpression)
+        stack.pop().ok_or(ParserError::EmptyExpression)
     }
 
     /// Handles the opening parenthesis by parsing the content within brackets.
@@ -128,9 +128,7 @@ impl<'a> Parser<'a> {
         stack: &mut Vec<Expression>,
         operator: char,
     ) -> Result<(), ParserError> {
-        let left = stack
-            .pop()
-            .ok_or_else(|| ParserError::ExpectedLeftOperand)?;
+        let left = stack.pop().ok_or(ParserError::ExpectedLeftOperand)?;
         let operation_result = self.parse_binary_operation(operator, left)?;
         stack.push(operation_result);
         Ok(())
@@ -145,7 +143,7 @@ impl<'a> Parser<'a> {
         let next = self
             .chars
             .next()
-            .ok_or_else(|| ParserError::ExpectedExpressionAfterNegation)?;
+            .ok_or(ParserError::ExpectedExpressionAfterNegation)?;
         let right = if next == '(' {
             let bracket = self.extract_bracket_contents()?;
             Parser::new(&bracket).parse()?
@@ -199,7 +197,7 @@ impl<'a> Parser<'a> {
         let mut bracket = String::new();
         let mut bracket_count = 1;
 
-        while let Some(c) = self.chars.next() {
+        for c in self.chars.by_ref() {
             match c {
                 '(' => bracket_count += 1,
                 ')' => bracket_count -= 1,

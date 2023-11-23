@@ -117,7 +117,7 @@ impl Proof {
                 self.lines = result;
                 Ok(())
             }
-            Err(err) => return Err(err),
+            Err(err) => Err(err),
         }
     }
 
@@ -186,8 +186,8 @@ impl Display for Line {
     }
 }
 
-fn join(array: &Vec<usize>) -> String {
-    let mut array = array.clone();
+fn join(array: &[usize]) -> String {
+    let mut array = array.to_owned();
     array.dedup();
     array.sort();
     array

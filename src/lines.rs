@@ -5,7 +5,6 @@ use std::{
 };
 
 use enum_iterator::Sequence;
-use rand::Rng;
 
 use crate::{
     expression::Expression,
@@ -106,6 +105,10 @@ impl PossibleFinder {
         self.node.lines.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.node.lines.is_empty()
+    }
+
     fn find_vars(&self) -> Vec<String> {
         let mut found_vars = Vec::new();
         for line in self.node.lines.iter() {
@@ -152,10 +155,8 @@ impl PossibleFinder {
         // Flatten to get all valid lines, sort and dedup
         let mut assumption_lines = lines
             .iter()
-            .filter(|x| x.is_some())
-            .map(|x| x.unwrap())
-            .map(|x| x.assumption_lines.clone())
             .flatten()
+            .flat_map(|x| x.assumption_lines.clone())
             .collect::<Vec<usize>>();
         assumption_lines.sort();
         assumption_lines.dedup();
@@ -167,7 +168,7 @@ impl PossibleFinder {
             // If the first line is an implication
             if let Expression::Implies(left, right) = &ab[0].expression {
                 // If the second line matches the left side of the implication
-                if !ab[1].matches_expression(&left) {
+                if !ab[1].matches_expression(left) {
                     continue;
                 }
                 let deductions = vec![ab[0].line_number, ab[1].line_number];
@@ -373,7 +374,6 @@ impl PossibleFinder {
                         if *d >= self.len() {
                             *d += a_deduction_lines.len();
                         }
-                        
                     }
                     l.line_number += a_deduction_lines.len();
                     resulting_lines.push(l);
@@ -446,8 +446,8 @@ impl PossibleFinder {
                 if indices[i] < self.node.lines.len() - 1 {
                     // Increment this index and reset all previous indices to 0.
                     indices[i] += 1;
-                    for j in 0..i {
-                        indices[j] = 0;
+                    for j in indices.iter_mut().take(i) {
+                        *j = 0;
                     }
                     return Some(result);
                 }
@@ -478,13 +478,10 @@ impl Possible {
 fn find_vars_for_expression(expression: &Expression, vars: &mut Vec<String>) {
     let expressions = expression.list_expressions();
     for expression in expressions {
-        match expression {
-            Expression::Var(var) => {
-                if !vars.contains(&var) {
-                    vars.push(var);
-                }
+        if let Expression::Var(var) = expression {
+            if !vars.contains(&var) {
+                vars.push(var);
             }
-            _ => {}
         }
     }
 }

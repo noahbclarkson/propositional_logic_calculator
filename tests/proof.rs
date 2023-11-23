@@ -75,5 +75,5 @@ fn test_double_negation_reverse() {
 
 #[test]
 fn test_multi_line_disjunction_elimination() {
-    create_and_test_proof(vec!["Pv(Q>R)","Q","P>W","R>W"], "W");
+    create_and_test_proof(vec!["Pv(Q>R)", "Q", "P>W", "R>W"], "W");
 }
