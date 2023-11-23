@@ -51,24 +51,24 @@ When you run the project, it asks for a propositional logic statement in the for
 
 ```bash
 Enter the propositional logic statement:
-PvQ,P>W,Q>W/W
+Pv(Q>R),Q,P>W/W
 ```
 
 ```bash
-Found proof: 
-Assumptions: [(P v Q), (P -> W), (Q -> W)]
+Assumptions: [(P v (Q -> R)), Q, (P -> W), (R -> W)]
 Conclusion: W
-Total Proof Steps: 8
+Total Proof Steps: 10
 Proof Steps:
-Line 1: (P v Q) [1] using Assumption
-Line 2: (P -> W) [2] using Assumption
-Line 3: (Q -> W) [3] using Assumption
-    Line 4: P [1] using Or Elimination Assumption from lines 1
-     Line 5: W [1, 2] using Modus Ponens from lines 2, 4
-    Line 6: Q [1] using Or Elimination Assumption from lines 1
-     Line 7: W [1, 3] using Modus Ponens from lines 3, 6
-Line 8: W [1, 2, 3] using Or Elimination from lines 4, 5, 6, 7
-
+Line 1: (P v (Q -> R)) [1] using A
+Line 2: Q [2] using A
+Line 3: (P -> W) [3] using A
+Line 4: (R -> W) [4] using A
+    Line 5: P [1] using A(vE) from lines 1
+    Line 6: W [1, 3] using MPP from lines 3, 5
+    Line 7: (Q -> R) [1] using A(vE) from lines 1
+    Line 8: R [1, 2] using MPP from lines 2, 7
+    Line 9: W [1, 2, 4] using MPP from lines 4, 8
+Line 10: W [1, 2, 3, 4] using vE from lines 5, 6, 7, 8, 9
 ```
 
 ## License

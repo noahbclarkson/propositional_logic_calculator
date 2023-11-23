@@ -417,8 +417,6 @@ impl PossibleFinder {
             Some(INNER_SEARCH_SETTINGS),
         );
         let result = proof.search();
-        print!("Inner proof: {}", proof);
-        println!("Inner proof result: {:?}", result);
         match result {
             Ok(_) => Ok(proof.get_deduction_lines()),
             Err(_) => Err(()),
