@@ -46,8 +46,7 @@ fn main() {
 
 The propositional_logic_calculator project can be interactively used to compute proofs for propositional logic statements. When the project is run, it prompts the user to enter a propositional logic statement. Upon entering a valid statement, the program computes and displays a proof for the given statement.
 
-Interactive Usage Example
-When you run the project, it asks for a propositional logic statement in the format `Assumptions/Conclusion`. Here's an example of how this interaction works:
+When you run the project, it asks for a propositional logic statement in the format `Assumptions/Conclusion`. Where each assumption is seperated by a comma and uses the symbols: `&` (AND), `>` (IMPLIES), `v`/`|` (OR), `-` (NOT) and any letter `A..=Z`. Here's an example of how this interaction works:
 
 ```bash
 Enter the propositional logic statement:
