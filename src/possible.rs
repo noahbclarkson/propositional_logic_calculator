@@ -1,3 +1,5 @@
+use rand::Rng;
+
 use crate::{
     expression::Expression,
     lines::{Line, Rule},
@@ -58,6 +60,7 @@ impl PossibleFinder {
         self.possible_dn_remove();
         self.possible_dn_add();
         self.possible_or_e();
+        self.possible_cp();
         // Check if an expression already exists in the proof (it is useless to add it again)
         self.possibles.retain(|x| {
             !self
@@ -268,9 +271,8 @@ impl PossibleFinder {
                 }
                 if found {
                     continue;
-                } else {
-                    return;
                 }
+                return;
             }
         }
         for line in self.clone().node.lines.iter() {
@@ -286,7 +288,7 @@ impl PossibleFinder {
                 );
                 a_lines.push(line.clone());
                 // Try to contruct a proof for the conclusion using the new assumption (a)
-                let a_deduction_lines = match self.search_sub_proof(a_lines) {
+                let a_deduction_lines = match self.search_sub_proof(a_lines, None) {
                     Ok(lines) => lines,
                     Err(_) => continue,
                 };
@@ -295,7 +297,7 @@ impl PossibleFinder {
                 let mut b_lines = self.node.lines.clone();
                 b_lines.push(line_b);
                 // Try to contruct a proof for the conclusion using the new assumption (b)
-                let b_deduction_lines = match self.search_sub_proof(b_lines) {
+                let b_deduction_lines = match self.search_sub_proof(b_lines, None) {
                     Ok(lines) => lines,
                     Err(_) => continue,
                 };
@@ -346,10 +348,88 @@ impl PossibleFinder {
         }
     }
 
-    fn search_sub_proof(&self, lines: Vec<Line>) -> Result<Vec<Line>, ()> {
+    fn possible_cp(&mut self) {
+        // If the conclusion is an implies we might need to use a conditional proof
+        if let Expression::Implies(left, right) = &self.node.conclusion {
+            for line in self.clone().node.lines.iter() {
+                if line.rule == Rule::ConditionalProofAssumption {
+                    // Here we've encountered a new sub-proof, we need to check whether this subproof ends in an orElimination
+                    // If it doesn't it means were still in the middle of a subproof and we can't add another orEliminationAssumption
+                    // If it does it means we've reached the end of the subproof and we can add another orEliminationAssumption
+                    let line_num = line.line_number;
+                    let mut found = false;
+                    for l in self.clone().node.lines.iter().skip(line_num) {
+                        if l.rule == Rule::ConditionalProof && l.deduction_lines.contains(&line_num)
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if found {
+                        continue;
+                    }
+                    return;
+                }
+            }
+            // First we need to assume the left side
+            let mut lines = self.node.lines.clone();
+            let assumption = Line::new(
+                vec![self.len()],
+                self.len(),
+                left.as_ref().clone(),
+                Rule::ConditionalProofAssumption,
+                vec![],
+            );
+            lines.push(assumption);
+            // Then we need to construct a proof for the right side using the assumption
+            let deduction_lines = match self.search_sub_proof(lines, Some(right.as_ref().clone())) {
+                Ok(lines) => lines,
+                Err(_) => return,
+            };
+            let rand = rand::thread_rng().gen_range(0..10000);
+            if rand < 5 {
+                for l in deduction_lines.clone() {
+                    println!("{}", l);
+                }
+            }
+            
+            let mut deduction_line_nums = vec![self.len()];
+            for l in deduction_lines.clone() {
+                deduction_line_nums.push(l.line_number);
+            }
+            let mut assumptions = Vec::new();
+            for l in deduction_lines.clone() {
+                for a in l.assumption_lines {
+                    if !assumptions.contains(&a) {
+                        assumptions.push(a);
+                    }
+                }
+            }
+            let final_line = Line::new(
+                assumptions,
+                deduction_lines.last().unwrap().line_number + 1,
+                self.node.conclusion.clone(),
+                Rule::ConditionalProof,
+                deduction_line_nums,
+            );
+            if rand < 5 {
+                println!("Final Line: \n{}", final_line);
+            }
+            let mut deduction_lines = deduction_lines.clone();
+            deduction_lines.push(final_line);
+            let possible = Possible::new(deduction_lines);
+            self.add_possible(possible);
+        }
+    }
+
+    fn search_sub_proof(
+        &self,
+        lines: Vec<Line>,
+        conclusion: Option<Expression>,
+    ) -> Result<Vec<Line>, ()> {
         let mut proof = Proof::new_raw(
             self.node.assumptions().clone(),
-            self.node.conclusion.clone(),
+            conclusion.unwrap_or(self.node.conclusion.clone()),
             lines,
             Some(INNER_SEARCH_SETTINGS),
         );

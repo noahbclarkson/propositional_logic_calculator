@@ -134,7 +134,7 @@ impl Proof {
 
 impl Display for Proof {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut in_nested_proof = false;
+        let mut nested_proof_level = 0;
 
         writeln!(f, "Assumptions: [{}]", join_expressions(&self.assumptions))?;
         writeln!(f, "Conclusion: {}", self.conclusion)?;
@@ -144,13 +144,19 @@ impl Display for Proof {
         for line in &self.lines {
             // Check if the line starts or ends a nested proof
             match line.rule {
-                Rule::OrEliminationAssumption => in_nested_proof = true,
-                Rule::OrElimination => in_nested_proof = false,
+                Rule::OrEliminationAssumption => nested_proof_level += 1,
+                Rule::OrElimination => nested_proof_level -= 1,
+                Rule::ConditionalProofAssumption => nested_proof_level += 1,
+                Rule::ConditionalProof => nested_proof_level -= 1,
                 _ => (),
             }
 
             // Apply indentation if in a nested proof
-            let indent = if in_nested_proof { "    " } else { "" };
+            let indent = if nested_proof_level > 0 {
+                "  ".repeat(nested_proof_level)
+            } else {
+                "".to_string()
+            };
             writeln!(f, "{}{}", indent, line)?;
         }
 

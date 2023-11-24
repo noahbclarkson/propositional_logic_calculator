@@ -88,3 +88,8 @@ fn test_disjunction_elimination_reversal() {
 fn test_dn_and_mtt() {
     create_and_test_proof(vec!["P>-Q", "Q"], "-P");
 }
+
+#[test]
+fn test_conditional_proof() {
+    create_and_test_proof(vec!["P>R", "R>Q"], "P>Q");
+}

@@ -72,7 +72,7 @@ Line 10: W [1, 2, 3, 4] using vE from lines 5, 6, 7, 8, 9
 
 ## To Do
 
-- [ ] Conditional Proof
+- [x] Conditional Proof
 - [ ] Reductio Ad Absurdum
 - [ ] Parallelism/Concurrency
 - [ ] Improved Proof Selection Strategies
