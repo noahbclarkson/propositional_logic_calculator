@@ -230,7 +230,7 @@ impl PossibleFinder {
             for c in vars {
                 let deductions = vec![line.line_number];
                 let assumptions = self.assumption_line_nums(deductions.clone());
-                let line = Line::new(
+                let poss_1 = Line::new(
                     assumptions,
                     self.len(),
                     Expression::Or(
@@ -240,26 +240,38 @@ impl PossibleFinder {
                     Rule::OrIntroduction,
                     deductions,
                 );
-                let mut line2 = line.clone();
-                line2.expression = Expression::Or(
+                let mut poss_2 = poss_1.clone();
+                poss_2.expression = Expression::Or(
                     Expression::Var(c.clone()).wrap(),
                     line.expression.clone().wrap(),
                 );
-                let possibles = vec![Possible::new_single(line), Possible::new_single(line2)];
+                let possibles = vec![Possible::new_single(poss_1), Possible::new_single(poss_2)];
                 self.possibles.extend(possibles);
             }
         }
     }
 
     fn possible_or_e(&mut self) {
-        // If the a line already contains an orEliminationAssumption, we can't add another one or we'll end up in an infinite loop
-        if self
-            .node
-            .lines
-            .iter()
-            .any(|x| x.rule == Rule::OrEliminationAssumption)
-        {
-            return;
+        // If the a line already contains an orEliminationAssumption and not orElimination, we can't add another one or we'll end up in an infinite loop
+        for line in self.clone().node.lines.iter() {
+            if line.rule == Rule::OrEliminationAssumption {
+                // Here we've encountered a new sub-proof, we need to check whether this subproof ends in an orElimination
+                // If it doesn't it means were still in the middle of a subproof and we can't add another orEliminationAssumption
+                // If it does it means we've reached the end of the subproof and we can add another orEliminationAssumption
+                let line_num = line.line_number;
+                let mut found = false;
+                for l in self.clone().node.lines.iter().skip(line_num) {
+                    if l.rule == Rule::OrElimination && l.deduction_lines.contains(&line_num) {
+                        found = true;
+                        break;
+                    }
+                }
+                if found {
+                    continue;
+                } else {
+                    return;
+                }
+            }
         }
         for line in self.clone().node.lines.iter() {
             // If the line is an or expression
@@ -342,6 +354,9 @@ impl PossibleFinder {
             Some(INNER_SEARCH_SETTINGS),
         );
         let result = proof.search();
+        if result.is_ok() {
+            println!("Found proof: \n{}", proof);
+        }
         match result {
             Ok(_) => Ok(proof.get_deduction_lines()),
             Err(_) => Err(()),
@@ -383,7 +398,7 @@ impl PossibleFinder {
     }
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct Possible {
     pub lines: Vec<Line>,
 }
@@ -406,5 +421,31 @@ fn find_vars_for_expression(expression: &Expression, vars: &mut Vec<String>) {
                 vars.push(var);
             }
         }
+    }
+    vars.sort();
+    vars.dedup();
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::expression::Expression;
+
+    use super::find_vars_for_expression;
+
+    #[test]
+    fn check_vars() {
+        let expression = Expression::Or(
+            Expression::Var("Q".into()).wrap(),
+            Expression::Var("P".into()).wrap(),
+        );
+        let expression_2 = Expression::Or(
+            Expression::Var("P".into()).wrap(),
+            Expression::Var("Q".into()).wrap(),
+        );
+        let mut vars = Vec::new();
+        let mut vars_2 = Vec::new();
+        find_vars_for_expression(&expression, &mut vars);
+        find_vars_for_expression(&expression_2, &mut vars_2);
+        assert_eq!(vars, vars_2);
     }
 }

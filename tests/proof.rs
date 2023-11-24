@@ -1,7 +1,7 @@
 use propositional_logic_calculator::proof::{Proof, SearchSettings, SearchSettingsBuilder};
 
-const MAX_ITERATIONS: usize = 100000;
-const MAX_LINE_LENGTH: usize = 17;
+const MAX_ITERATIONS: usize = 25000;
+const MAX_LINE_LENGTH: usize = 12;
 
 fn create_and_test_proof(assumptions: Vec<&str>, conclusion: &str) {
     let assumptions: Vec<String> = assumptions.iter().map(|x| x.to_string()).collect();
@@ -56,6 +56,7 @@ fn test_and_elimination() {
 #[test]
 fn test_disjunction_introduction() {
     create_and_test_proof(vec!["P"], "PvQ");
+    create_and_test_proof(vec!["Q"], "PvQ");
 }
 
 #[test]
@@ -76,4 +77,9 @@ fn test_double_negation_reverse() {
 #[test]
 fn test_multi_line_disjunction_elimination() {
     create_and_test_proof(vec!["Pv(Q>R)", "Q", "P>W", "R>W"], "W");
+}
+
+#[test]
+fn test_disjunction_elimination_reversal() {
+    create_and_test_proof(vec!["PvQ"], "QvP");
 }

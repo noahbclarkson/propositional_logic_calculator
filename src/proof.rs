@@ -1,6 +1,7 @@
 use crate::{
     error::{ParserError, ProofError},
-    lines::{Line, Rule}, possible::PossibleFinder,
+    lines::{Line, Rule},
+    possible::PossibleFinder,
 };
 use derive_builder::Builder;
 use std::{
@@ -12,8 +13,8 @@ use std::{
 
 use crate::{expression::Expression, parser::Parser};
 
-const DEFAULT_MAX_LINE_LENGTH: usize = 6;
-const DEFAULT_ITERATIONS: usize = 10000;
+const DEFAULT_MAX_LINE_LENGTH: usize = 15;
+const DEFAULT_ITERATIONS: usize = 50000;
 
 #[derive(Debug, Clone, Builder)]
 pub struct SearchSettings {
