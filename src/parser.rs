@@ -1,4 +1,4 @@
-use std::{iter::Peekable, rc::Rc, str::Chars};
+use std::{iter::Peekable, str::Chars};
 
 use crate::{error::ParserError, expression::Expression};
 

@@ -1,6 +1,6 @@
 use crate::{
     error::{ParserError, ProofError},
-    lines::{Line, PossibleFinder, Rule},
+    lines::{Line, Rule}, possible::PossibleFinder,
 };
 use derive_builder::Builder;
 use std::{

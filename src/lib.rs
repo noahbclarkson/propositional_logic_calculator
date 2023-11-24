@@ -3,3 +3,4 @@ pub mod expression;
 pub mod lines;
 pub mod parser;
 pub mod proof;
+pub mod possible;

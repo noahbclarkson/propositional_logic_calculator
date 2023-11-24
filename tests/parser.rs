@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use propositional_logic_calculator::{expression::Expression, parser::Parser};
 
 #[test]
