@@ -83,3 +83,8 @@ fn test_multi_line_disjunction_elimination() {
 fn test_disjunction_elimination_reversal() {
     create_and_test_proof(vec!["PvQ"], "QvP");
 }
+
+#[test]
+fn test_dn_and_mtt() {
+    create_and_test_proof(vec!["P>-Q", "Q"], "-P");
+}

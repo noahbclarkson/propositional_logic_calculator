@@ -354,9 +354,6 @@ impl PossibleFinder {
             Some(INNER_SEARCH_SETTINGS),
         );
         let result = proof.search();
-        if result.is_ok() {
-            println!("Found proof: \n{}", proof);
-        }
         match result {
             Ok(_) => Ok(proof.get_deduction_lines()),
             Err(_) => Err(()),
