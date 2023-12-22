@@ -3,7 +3,6 @@ use crate::{
     lines::{Line, Rule},
     possible::PossibleFinder,
 };
-use derive_builder::Builder;
 use std::{
     cell::RefCell,
     collections::VecDeque,
@@ -13,15 +12,31 @@ use std::{
 
 use crate::{expression::Expression, parser::Parser};
 
-const DEFAULT_MAX_LINE_LENGTH: usize = 15;
-const DEFAULT_ITERATIONS: usize = 50000;
-
-#[derive(Debug, Clone, Builder)]
+#[derive(Debug, Clone)]
 pub struct SearchSettings {
-    #[builder(default = "DEFAULT_MAX_LINE_LENGTH")]
     pub(crate) max_line_length: usize,
-    #[builder(default = "DEFAULT_ITERATIONS")]
     pub(crate) iterations: usize,
+}
+
+impl SearchSettings {
+    const DEFAULT_MAX_LINE_LENGTH: usize = 15;
+    const DEFAULT_ITERATIONS: usize = 50000;
+
+    fn from_incomplete(max_line_length: Option<usize>, iterations: Option<usize>) -> Self {
+        Self {
+            max_line_length: max_line_length.unwrap_or(Self::DEFAULT_MAX_LINE_LENGTH),
+            iterations: iterations.unwrap_or(Self::DEFAULT_ITERATIONS),
+        }
+    }
+}
+
+impl Default for SearchSettings {
+    fn default() -> Self {
+        Self {
+            max_line_length: Self::DEFAULT_MAX_LINE_LENGTH,
+            iterations: Self::DEFAULT_ITERATIONS,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -65,42 +80,66 @@ pub struct SearchNode {
     pub settings: Rc<SearchSettings>,
 }
 
+pub struct ProofBuilder {
+    assumptions: Vec<Expression>,
+    conclusion: Expression,
+    max_line_length: Option<usize>,
+    iterations: Option<usize>,
+}
+
+impl ProofBuilder {
+    pub fn new(assumptions: Vec<Expression>, conclusion: Expression) -> Self {
+        Self {
+            assumptions,
+            conclusion,
+            max_line_length: None,
+            iterations: None,
+        }
+    }
+
+    pub fn max_line_length(mut self, max_line_length: usize) -> Self {
+        self.max_line_length = Some(max_line_length);
+        self
+    }
+
+    pub fn iterations(mut self, iterations: usize) -> Self {
+        self.iterations = Some(iterations);
+        self
+    }
+
+    pub fn build(self) -> Proof {
+        Proof::new_raw(
+            self.assumptions.clone(),
+            self.conclusion,
+            create_assumption_lines(self.assumptions),
+            SearchSettings::from_incomplete(self.max_line_length, self.iterations),
+        )
+    }
+}
+
 impl Proof {
     pub(crate) fn new_raw(
         assumptions: Vec<Expression>,
         conclusion: Expression,
         lines: Vec<Line>,
-        settings: Option<SearchSettings>,
+        settings: SearchSettings,
     ) -> Self {
         Proof {
             assumptions,
             conclusion,
             lines,
-            settings: Rc::new(
-                settings.unwrap_or_else(|| SearchSettingsBuilder::default().build().unwrap()),
-            ),
+            settings: Rc::new(settings),
             iterations: 0,
         }
     }
 
-    pub fn new(
-        assumptions: Vec<String>,
-        conclusion: String,
-        settings: Option<SearchSettings>,
-    ) -> Result<Self, ProofError> {
-        let assumptions = assumptions
-            .iter()
-            .map(|x| parse_expressions(x))
-            .collect::<Result<Vec<Expression>, ParserError>>()?;
-        let conclusion = parse_expressions(&conclusion)?;
+    pub fn new(assumptions: Vec<Expression>, conclusion: Expression) -> Result<Self, ProofError> {
         let lines = create_assumption_lines(assumptions.clone());
         Ok(Proof {
             assumptions,
             conclusion,
             lines,
-            settings: Rc::new(
-                settings.unwrap_or_else(|| SearchSettingsBuilder::default().build().unwrap()),
-            ),
+            settings: Rc::new(SearchSettings::default()),
             iterations: 0,
         })
     }
@@ -298,7 +337,7 @@ pub fn create_assumption_lines(assumptions: Vec<Expression>) -> Vec<Line> {
         .collect()
 }
 
-pub fn parse_expressions(expression: &str) -> Result<Expression, ParserError> {
+pub fn parse_expression(expression: &str) -> Result<Expression, ParserError> {
     let mut parser = Parser::new(expression);
     parser.parse()
 }
