@@ -73,46 +73,6 @@ pub struct SearchNode {
     pub settings: Rc<SearchSettings>,
 }
 
-pub struct ProofBuilder {
-    assumptions: Vec<Expression>,
-    conclusion: Expression,
-    settings: SearchSettings,
-}
-
-impl ProofBuilder {
-    pub fn new(assumptions: Vec<Expression>, conclusion: Expression) -> Self {
-        Self {
-            assumptions,
-            conclusion,
-            settings: SearchSettings::default(),
-        }
-    }
-
-    pub fn settings(mut self, settings: SearchSettings) -> Self {
-        self.settings = settings;
-        self
-    }
-
-    pub fn max_line_length(mut self, max_line_length: usize) -> Self {
-        self.settings.max_line_length = max_line_length;
-        self
-    }
-
-    pub fn iterations(mut self, iterations: usize) -> Self {
-        self.settings.iterations = iterations;
-        self
-    }
-
-    pub fn build(self) -> Proof {
-        Proof::new_raw(
-            self.assumptions.clone(),
-            self.conclusion,
-            create_assumption_lines(self.assumptions),
-            self.settings,
-        )
-    }
-}
-
 impl Proof {
     pub(crate) fn new_raw(
         assumptions: Vec<Expression>,
@@ -129,15 +89,24 @@ impl Proof {
         }
     }
 
-    pub fn new(assumptions: Vec<Expression>, conclusion: Expression) -> Result<Self, ProofError> {
-        let lines = create_assumption_lines(assumptions.clone());
-        Ok(Proof {
-            assumptions,
+    pub fn new(assumptions: Vec<Expression>, conclusion: Expression) -> Self {
+        Self::with_settings(assumptions, conclusion, SearchSettings::default())
+    }
+
+    /// `SearchSettings` impls `Default`, so if user has incomplete settings they can just
+    /// ```ignore
+    /// Proof::with_settings(..., SearchSettings {
+    ///     max_line_length: 10,
+    ///     ..Default::default(),
+    /// })
+    /// ```
+    pub fn with_settings(assumptions: Vec<Expression>, conclusion: Expression, settings: SearchSettings) -> Self {
+        Proof::new_raw(
+            assumptions.clone(),
             conclusion,
-            lines,
-            settings: Rc::new(SearchSettings::default()),
-            iterations: 0,
-        })
+            create_assumption_lines(assumptions),
+            settings,
+        )
     }
 
     pub fn search(&mut self) -> Result<(), ProofError> {
