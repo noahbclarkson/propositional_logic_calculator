@@ -21,13 +21,6 @@ pub struct SearchSettings {
 impl SearchSettings {
     const DEFAULT_MAX_LINE_LENGTH: usize = 15;
     const DEFAULT_ITERATIONS: usize = 50000;
-
-    fn from_incomplete(max_line_length: Option<usize>, iterations: Option<usize>) -> Self {
-        Self {
-            max_line_length: max_line_length.unwrap_or(Self::DEFAULT_MAX_LINE_LENGTH),
-            iterations: iterations.unwrap_or(Self::DEFAULT_ITERATIONS),
-        }
-    }
 }
 
 impl Default for SearchSettings {
@@ -83,8 +76,7 @@ pub struct SearchNode {
 pub struct ProofBuilder {
     assumptions: Vec<Expression>,
     conclusion: Expression,
-    max_line_length: Option<usize>,
-    iterations: Option<usize>,
+    settings: SearchSettings,
 }
 
 impl ProofBuilder {
@@ -92,18 +84,22 @@ impl ProofBuilder {
         Self {
             assumptions,
             conclusion,
-            max_line_length: None,
-            iterations: None,
+            settings: SearchSettings::default(),
         }
     }
 
+    pub fn settings(mut self, settings: SearchSettings) -> Self {
+        self.settings = settings;
+        self
+    }
+
     pub fn max_line_length(mut self, max_line_length: usize) -> Self {
-        self.max_line_length = Some(max_line_length);
+        self.settings.max_line_length = max_line_length;
         self
     }
 
     pub fn iterations(mut self, iterations: usize) -> Self {
-        self.iterations = Some(iterations);
+        self.settings.iterations = iterations;
         self
     }
 
@@ -112,7 +108,7 @@ impl ProofBuilder {
             self.assumptions.clone(),
             self.conclusion,
             create_assumption_lines(self.assumptions),
-            SearchSettings::from_incomplete(self.max_line_length, self.iterations),
+            self.settings,
         )
     }
 }
