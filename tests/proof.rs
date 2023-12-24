@@ -1,4 +1,4 @@
-use propositional_logic_calculator::proof::{parse_expression, ProofBuilder};
+use propositional_logic_calculator::proof::{parse_expression, Proof, SearchSettings};
 
 fn create_and_test_proof(assumptions: Vec<&str>, conclusion: &str) {
     let assumptions = assumptions
@@ -8,10 +8,14 @@ fn create_and_test_proof(assumptions: Vec<&str>, conclusion: &str) {
         .unwrap();
     let conclusion = parse_expression(conclusion).unwrap();
 
-    let mut proof = ProofBuilder::new(assumptions, conclusion)
-        .max_line_length(12)
-        .iterations(25_000)
-        .build();
+    let mut proof = Proof::with_settings(
+        assumptions,
+        conclusion,
+        SearchSettings {
+            max_line_length: 12,
+            iterations: 25_000,
+        },
+    );
     let result = proof.search();
     match result {
         Ok(_) => println!("Found proof: \n{}", proof),

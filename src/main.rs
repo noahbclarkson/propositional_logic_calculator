@@ -1,5 +1,5 @@
 use anyhow::Context;
-use propositional_logic_calculator::proof::{parse_expression, ProofBuilder};
+use propositional_logic_calculator::proof::{parse_expression, Proof, SearchSettings};
 
 fn main() -> anyhow::Result<()> {
     println!("Enter the propositional logic statement: ");
@@ -16,10 +16,14 @@ fn main() -> anyhow::Result<()> {
         .collect::<Result<_, _>>()?;
     let conclusion = parse_expression(conclusion_str)?;
 
-    let mut proof = ProofBuilder::new(assumptions, conclusion)
-        .max_line_length(20)
-        .iterations(100_000)
-        .build();
+    let mut proof = Proof::with_settings(
+        assumptions,
+        conclusion,
+        SearchSettings {
+            max_line_length: 20,
+            iterations: 100_000,
+        },
+    );
 
     proof.search().context("Did not find proof")?;
     println!("{}", proof);

@@ -14,8 +14,8 @@ use crate::{expression::Expression, parser::Parser};
 
 #[derive(Debug, Clone)]
 pub struct SearchSettings {
-    pub(crate) max_line_length: usize,
-    pub(crate) iterations: usize,
+    pub max_line_length: usize,
+    pub iterations: usize,
 }
 
 impl SearchSettings {
