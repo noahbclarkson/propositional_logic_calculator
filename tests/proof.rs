@@ -1,25 +1,26 @@
-use propositional_logic_calculator::proof::{Proof, SearchSettings, SearchSettingsBuilder};
-
-const MAX_ITERATIONS: usize = 25000;
-const MAX_LINE_LENGTH: usize = 12;
+use propositional_logic_calculator::proof::{parse_expression, Proof, SearchSettings};
 
 fn create_and_test_proof(assumptions: Vec<&str>, conclusion: &str) {
-    let assumptions: Vec<String> = assumptions.iter().map(|x| x.to_string()).collect();
-    let conclusion = conclusion.to_string();
-    let mut proof = Proof::new(assumptions, conclusion, build_settings()).unwrap();
+    let assumptions = assumptions
+        .into_iter()
+        .map(parse_expression)
+        .collect::<Result<_, _>>()
+        .unwrap();
+    let conclusion = parse_expression(conclusion).unwrap();
+
+    let mut proof = Proof::with_settings(
+        assumptions,
+        conclusion,
+        SearchSettings {
+            max_line_length: 12,
+            iterations: 25_000,
+        },
+    );
     let result = proof.search();
     match result {
         Ok(_) => println!("Found proof: \n{}", proof),
         Err(state) => panic!("Did not find proof, state: {:?}", state),
     }
-}
-
-fn build_settings() -> Option<SearchSettings> {
-    SearchSettingsBuilder::default()
-        .iterations(MAX_ITERATIONS)
-        .max_line_length(MAX_LINE_LENGTH)
-        .build()
-        .ok()
 }
 
 #[test]
