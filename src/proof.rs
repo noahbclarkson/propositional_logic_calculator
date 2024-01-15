@@ -100,7 +100,11 @@ impl Proof {
     ///     ..Default::default(),
     /// })
     /// ```
-    pub fn with_settings(assumptions: Vec<Expression>, conclusion: Expression, settings: SearchSettings) -> Self {
+    pub fn with_settings(
+        assumptions: Vec<Expression>,
+        conclusion: Expression,
+        settings: SearchSettings,
+    ) -> Self {
         Proof::new_raw(
             assumptions.clone(),
             conclusion,

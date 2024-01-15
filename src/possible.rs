@@ -392,7 +392,7 @@ impl PossibleFinder {
                     println!("{}", l);
                 }
             }
-            
+
             let mut deduction_line_nums = vec![self.len()];
             for l in deduction_lines.clone() {
                 deduction_line_nums.push(l.line_number);
