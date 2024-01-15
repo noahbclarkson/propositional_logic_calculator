@@ -18,7 +18,7 @@ pub enum Expression {
     Not(Rc<Expression>),
 
     /// Represents a variable in the logical expression, stored as a `String`.
-    Var(String),
+    Var(char),
 }
 
 /// Implementation of the `Display` trait for the `Expression` enum.
@@ -36,7 +36,6 @@ impl Display for Expression {
 }
 
 impl Expression {
-
     /// Adds an Rc wrapper to the current `Expression` node.
     pub fn wrap(self) -> Rc<Expression> {
         Rc::new(self)
@@ -46,20 +45,20 @@ impl Expression {
     /// It traverses the AST recursively to gather all expressions.
     ///
     /// Returns a `Vec<Expression>` containing all unique expressions found.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// use propositional_logic_calculator::expression::Expression;
     /// use std::rc::Rc;
-    /// 
-    /// let expr = Expression::And(Expression::Var("A".to_string()).wrap(),
+    ///
+    /// let expr = Expression::And(Expression::Var('A').wrap(),
     ///     Expression::Or(
-    ///         Expression::Var("B".to_string()).wrap(),
-    ///         Expression::Var("C".to_string()).wrap(),
+    ///         Expression::Var('B').wrap(),
+    ///         Expression::Var('C').wrap(),
     ///     ).wrap(),
     /// );
-    /// 
+    ///
     /// let expressions = expr.list_expressions();
     /// assert_eq!(expressions.len(), 5);
     /// ```

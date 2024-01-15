@@ -95,7 +95,7 @@ impl<'a> Parser<'a> {
     ///
     /// Returns `Ok(())` if successfully handled, otherwise a `ParserError`
     fn handle_variable(&mut self, stack: &mut Vec<Expression>, c: char) -> Result<(), ParserError> {
-        stack.push(Expression::Var(c.to_string()));
+        stack.push(Expression::Var(c));
         Ok(())
     }
 
@@ -148,7 +148,7 @@ impl<'a> Parser<'a> {
             let bracket = self.extract_bracket_contents()?;
             Parser::new(&bracket).parse()?
         } else {
-            Expression::Var(next.to_string())
+            Expression::Var(next)
         };
 
         Ok(Expression::Not(right.wrap()))

@@ -15,7 +15,7 @@ const INNER_SEARCH_SETTINGS: SearchSettings = SearchSettings {
 pub struct PossibleFinder {
     node: Box<SearchNode>,
     possibles: Vec<Possible>,
-    vars: Vec<String>,
+    vars: Vec<char>,
 }
 
 impl PossibleFinder {
@@ -36,7 +36,7 @@ impl PossibleFinder {
         self.node.lines.is_empty()
     }
 
-    fn find_vars(&self) -> Vec<String> {
+    fn find_vars(&self) -> Vec<char> {
         let mut found_vars = Vec::new();
         for line in self.node.lines.iter() {
             find_vars_for_expression(&line.expression, &mut found_vars);
@@ -236,18 +236,13 @@ impl PossibleFinder {
                 let poss_1 = Line::new(
                     assumptions,
                     self.len(),
-                    Expression::Or(
-                        line.expression.clone().wrap(),
-                        Expression::Var(c.clone()).wrap(),
-                    ),
+                    Expression::Or(line.expression.clone().wrap(), Expression::Var(c).wrap()),
                     Rule::OrIntroduction,
                     deductions,
                 );
                 let mut poss_2 = poss_1.clone();
-                poss_2.expression = Expression::Or(
-                    Expression::Var(c.clone()).wrap(),
-                    line.expression.clone().wrap(),
-                );
+                poss_2.expression =
+                    Expression::Or(Expression::Var(c).wrap(), line.expression.clone().wrap());
                 let possibles = vec![Possible::new_single(poss_1), Possible::new_single(poss_2)];
                 self.possibles.extend(possibles);
             }
@@ -490,7 +485,7 @@ impl Possible {
     }
 }
 
-fn find_vars_for_expression(expression: &Expression, vars: &mut Vec<String>) {
+fn find_vars_for_expression(expression: &Expression, vars: &mut Vec<char>) {
     let expressions = expression.list_expressions();
     for expression in expressions {
         if let Expression::Var(var) = expression {
@@ -511,14 +506,8 @@ mod tests {
 
     #[test]
     fn check_vars() {
-        let expression = Expression::Or(
-            Expression::Var("Q".into()).wrap(),
-            Expression::Var("P".into()).wrap(),
-        );
-        let expression_2 = Expression::Or(
-            Expression::Var("P".into()).wrap(),
-            Expression::Var("Q".into()).wrap(),
-        );
+        let expression = Expression::Or(Expression::Var('Q').wrap(), Expression::Var('P').wrap());
+        let expression_2 = Expression::Or(Expression::Var('P').wrap(), Expression::Var('Q').wrap());
         let mut vars = Vec::new();
         let mut vars_2 = Vec::new();
         find_vars_for_expression(&expression, &mut vars);
