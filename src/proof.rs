@@ -3,7 +3,6 @@ use crate::{
     lines::{Line, Rule},
     possible::PossibleFinder,
 };
-use derive_builder::Builder;
 use std::{
     cell::RefCell,
     collections::VecDeque,
@@ -13,15 +12,24 @@ use std::{
 
 use crate::{expression::Expression, parser::Parser};
 
-const DEFAULT_MAX_LINE_LENGTH: usize = 15;
-const DEFAULT_ITERATIONS: usize = 50000;
-
-#[derive(Debug, Clone, Builder)]
+#[derive(Debug, Clone)]
 pub struct SearchSettings {
-    #[builder(default = "DEFAULT_MAX_LINE_LENGTH")]
-    pub(crate) max_line_length: usize,
-    #[builder(default = "DEFAULT_ITERATIONS")]
-    pub(crate) iterations: usize,
+    pub max_line_length: usize,
+    pub iterations: usize,
+}
+
+impl SearchSettings {
+    const DEFAULT_MAX_LINE_LENGTH: usize = 15;
+    const DEFAULT_ITERATIONS: usize = 50000;
+}
+
+impl Default for SearchSettings {
+    fn default() -> Self {
+        Self {
+            max_line_length: Self::DEFAULT_MAX_LINE_LENGTH,
+            iterations: Self::DEFAULT_ITERATIONS,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -70,39 +78,35 @@ impl Proof {
         assumptions: Vec<Expression>,
         conclusion: Expression,
         lines: Vec<Line>,
-        settings: Option<SearchSettings>,
+        settings: SearchSettings,
     ) -> Self {
         Proof {
             assumptions,
             conclusion,
             lines,
-            settings: Rc::new(
-                settings.unwrap_or_else(|| SearchSettingsBuilder::default().build().unwrap()),
-            ),
+            settings: Rc::new(settings),
             iterations: 0,
         }
     }
 
-    pub fn new(
-        assumptions: Vec<String>,
-        conclusion: String,
-        settings: Option<SearchSettings>,
-    ) -> Result<Self, ProofError> {
-        let assumptions = assumptions
-            .iter()
-            .map(|x| parse_expressions(x))
-            .collect::<Result<Vec<Expression>, ParserError>>()?;
-        let conclusion = parse_expressions(&conclusion)?;
-        let lines = create_assumption_lines(assumptions.clone());
-        Ok(Proof {
-            assumptions,
+    pub fn new(assumptions: Vec<Expression>, conclusion: Expression) -> Self {
+        Self::with_settings(assumptions, conclusion, SearchSettings::default())
+    }
+
+    /// `SearchSettings` impls `Default`, so if user has incomplete settings they can just
+    /// ```ignore
+    /// Proof::with_settings(..., SearchSettings {
+    ///     max_line_length: 10,
+    ///     ..Default::default(),
+    /// })
+    /// ```
+    pub fn with_settings(assumptions: Vec<Expression>, conclusion: Expression, settings: SearchSettings) -> Self {
+        Proof::new_raw(
+            assumptions.clone(),
             conclusion,
-            lines,
-            settings: Rc::new(
-                settings.unwrap_or_else(|| SearchSettingsBuilder::default().build().unwrap()),
-            ),
-            iterations: 0,
-        })
+            create_assumption_lines(assumptions),
+            settings,
+        )
     }
 
     pub fn search(&mut self) -> Result<(), ProofError> {
@@ -298,7 +302,7 @@ pub fn create_assumption_lines(assumptions: Vec<Expression>) -> Vec<Line> {
         .collect()
 }
 
-pub fn parse_expressions(expression: &str) -> Result<Expression, ParserError> {
+pub fn parse_expression(expression: &str) -> Result<Expression, ParserError> {
     let mut parser = Parser::new(expression);
     parser.parse()
 }

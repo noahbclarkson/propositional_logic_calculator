@@ -431,7 +431,7 @@ impl PossibleFinder {
             self.node.assumptions().clone(),
             conclusion.unwrap_or(self.node.conclusion.clone()),
             lines,
-            Some(INNER_SEARCH_SETTINGS),
+            INNER_SEARCH_SETTINGS,
         );
         let result = proof.search();
         match result {
