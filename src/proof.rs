@@ -156,6 +156,8 @@ impl Display for Proof {
                 Rule::OrElimination => nested_proof_level -= 1,
                 Rule::ConditionalProofAssumption => nested_proof_level += 1,
                 Rule::ConditionalProof => nested_proof_level -= 1,
+                Rule::ReductioAdAbsurdumAssumption => nested_proof_level += 1,
+                Rule::ReductioAdAbsurdum => nested_proof_level -= 1,
                 _ => (),
             }
 

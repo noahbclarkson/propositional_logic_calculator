@@ -61,6 +61,7 @@ impl PossibleFinder {
         self.possible_dn_add();
         self.possible_or_e();
         self.possible_cp();
+        self.possible_raa();
         // Check if an expression already exists in the proof (it is useless to add it again)
         self.possibles.retain(|x| {
             !self
@@ -417,6 +418,80 @@ impl PossibleFinder {
         }
     }
 
+    fn possible_raa(&mut self) {
+        let not_conclusion = Expression::Not(self.node.conclusion.clone().wrap());
+        if self.node.lines.len() > 6 {
+            return;
+        }
+        // Avoid nested RAA assumptions that haven't been closed
+        for line in self.clone().node.lines.iter() {
+            if line.rule == Rule::ReductioAdAbsurdumAssumption {
+                let line_num = line.line_number;
+                let mut found = false;
+                for l in self.clone().node.lines.iter().skip(line_num) {
+                    if l.rule == Rule::ReductioAdAbsurdum && l.deduction_lines.contains(&line_num) {
+                        found = true;
+                        break;
+                    }
+                }
+                if found {
+                    continue;
+                }
+                return;
+            }
+        }
+
+        // If there is no RAA assumption yet, add it
+        if !self
+            .node
+            .lines
+            .iter()
+            .any(|l| l.rule == Rule::ReductioAdAbsurdumAssumption)
+        {
+            let line = Line::new(
+                vec![self.len()],
+                self.len(),
+                not_conclusion.clone(),
+                Rule::ReductioAdAbsurdumAssumption,
+                vec![],
+            );
+            self.add_possible(Possible::new_single(line));
+            return;
+        }
+
+        // Find contradiction under the RAA assumption
+        let assumption_index = self
+            .node
+            .lines
+            .iter()
+            .find(|l| l.rule == Rule::ReductioAdAbsurdumAssumption)
+            .unwrap()
+            .line_number;
+        for a in &self.node.lines {
+            for b in &self.node.lines {
+                if a.line_number >= b.line_number {
+                    continue;
+                }
+                if a.assumption_lines.contains(&assumption_index)
+                    && b.assumption_lines.contains(&assumption_index)
+                    && is_negation(&a.expression, &b.expression)
+                {
+                    let deductions = vec![assumption_index, a.line_number, b.line_number];
+                    let assumptions = self.assumption_line_nums(deductions.clone());
+                    let line = Line::new(
+                        assumptions,
+                        self.len(),
+                        self.node.conclusion.clone(),
+                        Rule::ReductioAdAbsurdum,
+                        deductions,
+                    );
+                    self.add_possible(Possible::new_single(line));
+                    return;
+                }
+            }
+        }
+    }
+
     fn search_sub_proof(
         &self,
         lines: Vec<Line>,
@@ -467,6 +542,16 @@ impl PossibleFinder {
             is_done = true;
             Some(result)
         })
+    }
+}
+
+fn is_negation(a: &Expression, b: &Expression) -> bool {
+    (match a {
+        Expression::Not(inner) => inner.as_ref() == b,
+        _ => false,
+    }) || match b {
+        Expression::Not(inner) => inner.as_ref() == a,
+        _ => false,
     }
 }
 

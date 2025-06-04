@@ -54,7 +54,8 @@ pub enum Rule {
     OrIntroduction,
     OrElimination,
     OrEliminationAssumption,
-    ReductioAdAbsurdium,
+    ReductioAdAbsurdumAssumption,
+    ReductioAdAbsurdum,
 }
 
 impl Display for Rule {
@@ -71,7 +72,8 @@ impl Display for Rule {
             Rule::OrIntroduction => write!(f, "vI"),
             Rule::OrElimination => write!(f, "vE"),
             Rule::OrEliminationAssumption => write!(f, "A(vE)"),
-            Rule::ReductioAdAbsurdium => write!(f, "RAA"),
+            Rule::ReductioAdAbsurdumAssumption => write!(f, "A(RAA)"),
+            Rule::ReductioAdAbsurdum => write!(f, "RAA"),
         }
     }
 }
